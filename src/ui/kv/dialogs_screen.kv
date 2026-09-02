@@ -1,0 +1,220 @@
+#:kivy 2.3.0
+#:import dp kivy.metrics.dp
+
+<DialogItemRow>:
+    orientation: "horizontal"
+    size_hint_y: None
+    height: dp(76)
+    padding: [dp(14), dp(8)]
+    spacing: dp(14)
+    canvas.before:
+        Color:
+            rgba: (0.94, 0.95, 0.97, 1) if self.state == "down" else (0, 0, 0, 0)
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+    CircularAvatar:
+        source: root.avatar_url
+        initials: root.initials
+        peer_id: root.peer_id
+        size_dp: 52
+        is_online: root.is_online
+        pos_hint: {"center_y": 0.5}
+
+    BoxLayout:
+        orientation: "vertical"
+        spacing: dp(4)
+        pos_hint: {"center_y": 0.5}
+
+        BoxLayout:
+            orientation: "horizontal"
+            size_hint_y: None
+            height: dp(22)
+            spacing: dp(4)
+
+            Label:
+                text: root.title
+                color: (0.1, 0.1, 0.1, 1)
+                bold: True
+                font_size: "16sp"
+                halign: "left"
+                valign: "middle"
+                text_size: (self.width, None)
+                shorten: True
+                shorten_from: "right"
+
+            # Pinned Chat Icon (кнопка с иголкой)
+            MDIcon:
+                icon: "pin"
+                size_hint: (None, None)
+                size: (dp(16), dp(16)) if root.is_pinned else (0, 0)
+                opacity: 1 if root.is_pinned else 0
+                theme_icon_color: "Custom"
+                icon_color: (0.45, 0.48, 0.54, 1)
+                pos_hint: {"center_y": 0.5}
+
+            Label:
+                text: root.time_text
+                color: (0.55, 0.55, 0.55, 1)
+                font_size: "12sp"
+                size_hint_x: None
+                width: dp(56)
+                halign: "right"
+                valign: "middle"
+
+        BoxLayout:
+            orientation: "horizontal"
+            size_hint_y: None
+            height: dp(20)
+
+            Label:
+                text: root.last_message
+                color: (0.45, 0.45, 0.45, 1)
+                font_size: "14sp"
+                halign: "left"
+                valign: "middle"
+                text_size: (self.width, None)
+                shorten: True
+                shorten_from: "right"
+
+            # Unread count badge
+            Label:
+                text: root.unread_text
+                color: (1, 1, 1, 1)
+                bold: True
+                font_size: "11sp"
+                size_hint: (None, None)
+                width: max(dp(22), self.texture_size[0] + dp(10)) if root.unread_count > 0 else 0
+                height: dp(20) if root.unread_count > 0 else 0
+                opacity: 1 if root.unread_count > 0 else 0
+                halign: "center"
+                valign: "middle"
+                canvas.before:
+                    Color:
+                        rgba: (0.55, 0.58, 0.64, 1) if root.is_muted else (0.24, 0.48, 0.95, 1)
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [dp(10)]
+
+
+<DialogsScreen>:
+    md_bg_color: self.theme_cls.backgroundColor
+
+    BoxLayout:
+        orientation: "vertical"
+
+        # Top App Bar
+        MDTopAppBar:
+            type: "small"
+
+            MDTopAppBarTitle:
+                text: "Сообщения"
+
+            MDTopAppBarTrailingButtonContainer:
+                MDIconButton:
+                    icon: "refresh"
+                    on_release: root.vm.refresh_dialogs()
+
+        # Horizontal ScrollView for Folders (Чаты, ЛС, Каналы, Архив, Бизнес, Группы, +)
+        ScrollView:
+            do_scroll_y: False
+            do_scroll_x: True
+            size_hint_y: None
+            height: dp(42)
+            bar_width: 0
+
+            BoxLayout:
+                id: folder_container
+                orientation: "horizontal"
+                size_hint_x: None
+                width: self.minimum_width
+                padding: [dp(12), dp(4)]
+                spacing: dp(8)
+
+        # Conversations RecycleView (hidden when in unsupported folders)
+        RecycleView:
+            id: rv_dialogs
+            viewclass: "DialogItemRow"
+            data: root.vm.dialogs
+            scroll_type: ['bars', 'content']
+            bar_width: dp(4)
+            size_hint_y: 1 if root.vm.active_folder_id not in ('system_business', 'system_channels') else None
+            height: 0 if root.vm.active_folder_id in ('system_business', 'system_channels') else self.parent.height
+            opacity: 1 if root.vm.active_folder_id not in ('system_business', 'system_channels') else 0
+            disabled: root.vm.active_folder_id in ('system_business', 'system_channels')
+            on_scroll_y: root.on_rv_scroll(self.scroll_y)
+
+            RecycleBoxLayout:
+                default_size: None, dp(76)
+                default_size_hint: 1, None
+                size_hint_y: None
+                height: self.minimum_height
+                orientation: "vertical"
+
+        # Placeholder for unsupported folders (Бизнес и Каналы)
+        BoxLayout:
+            orientation: "vertical"
+            size_hint_y: 1 if root.vm.active_folder_id in ('system_business', 'system_channels') else None
+            height: 0 if root.vm.active_folder_id not in ('system_business', 'system_channels') else self.parent.height
+            opacity: 1 if root.vm.active_folder_id in ('system_business', 'system_channels') else 0
+            disabled: root.vm.active_folder_id not in ('system_business', 'system_channels')
+            padding: [dp(24), dp(32)]
+            spacing: dp(12)
+
+            Widget:
+                size_hint_y: 1
+
+            MDIcon:
+                icon: "alert-circle-outline"
+                theme_icon_color: "Custom"
+                icon_color: (0.55, 0.58, 0.64, 1)
+                size_hint: (None, None)
+                size: (dp(56), dp(56))
+                pos_hint: {"center_x": 0.5}
+
+            Label:
+                text: "Раздел не поддерживается"
+                bold: True
+                font_size: "18sp"
+                color: (0.15, 0.18, 0.22, 1)
+                halign: "center"
+                size_hint_y: None
+                height: dp(26)
+
+            Label:
+                text: "Папка «" + ("Бизнес" if root.vm.active_folder_id == "system_business" else "Каналы") + "» пока не поддерживается"
+                font_size: "14sp"
+                color: (0.5, 0.53, 0.58, 1)
+                halign: "center"
+                size_hint_y: None
+                height: dp(22)
+
+            Widget:
+                size_hint_y: 1.5
+
+        # Bottom loading more indicator
+        BoxLayout:
+            size_hint_y: None
+            height: dp(36) if root.vm.is_loading_more else 0
+            opacity: 1 if root.vm.is_loading_more else 0
+            MDCircularProgressIndicator:
+                size_hint: (None, None)
+                size: (dp(22), dp(22))
+                pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+        # Loading indicator for empty initial state
+        BoxLayout:
+            size_hint_y: None
+            height: dp(48) if root.vm.is_loading else 0
+            opacity: 1 if root.vm.is_loading else 0
+            MDCircularProgressIndicator:
+                size_hint: (None, None)
+                size: (dp(32), dp(32))
+                pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+        # Bottom DockBar (Сообщения | >/. | Настройки)
+        DockBar:
+            id: dockbar
+            active_tab: "dialogs"

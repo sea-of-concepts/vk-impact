@@ -1,0 +1,63 @@
+#:kivy 2.3.0
+#:import dp kivy.metrics.dp
+
+<DockItem>:
+    anchor_x: "center"
+    anchor_y: "center"
+
+<DockBar>:
+    orientation: "horizontal"
+    size_hint_y: None
+    height: dp(68)
+    padding: [dp(16), dp(10), dp(16), dp(12)]
+    spacing: dp(16)
+    canvas.before:
+        Color:
+            rgba: (1, 1, 1, 1)
+        Rectangle:
+            pos: self.pos
+            size: self.size
+        Color:
+            rgba: (0.88, 0.90, 0.93, 1)
+        Line:
+            points: [self.x, self.top, self.right, self.top]
+            width: 1
+
+    # 1. Dialogs (Messages)
+    DockItem:
+        size_hint_x: 0.33
+        on_release: root.switch_tab("dialogs")
+
+        MDIcon:
+            icon: "message-processing-outline" if root.active_tab != "dialogs" else "message-processing"
+            theme_icon_color: "Custom"
+            icon_color: (0.24, 0.48, 0.95, 1) if root.active_tab == "dialogs" else (0.55, 0.58, 0.63, 1)
+            size_hint: (None, None)
+            size: (dp(32), dp(32))
+
+    # 2. Logs Console (>/. )
+    DockItem:
+        size_hint_x: 0.34
+        on_release: root.switch_tab("logs")
+
+        Label:
+            text: ">/."
+            bold: True
+            font_size: "22sp"
+            color: (0.24, 0.48, 0.95, 1) if root.active_tab == "logs" else (0.55, 0.58, 0.63, 1)
+            size_hint: (None, None)
+            size: (dp(32), dp(32))
+            halign: "center"
+            valign: "middle"
+
+    # 3. Settings
+    DockItem:
+        size_hint_x: 0.33
+        on_release: root.switch_tab("settings")
+
+        MDIcon:
+            icon: "cog" if root.active_tab == "settings" else "cog-outline"
+            theme_icon_color: "Custom"
+            icon_color: (0.24, 0.48, 0.95, 1) if root.active_tab == "settings" else (0.55, 0.58, 0.63, 1)
+            size_hint: (None, None)
+            size: (dp(32), dp(32))

@@ -1,0 +1,10 @@
+kivy>=2.3.0
+kivymd>=2.0.0
+asynckivy>=0.6.4
+asyncgui>=0.6.3
+aiohttp>=3.10.0
+httpx>=0.27.0
+pydantic>=2.7.0
+cryptography>=42.0.0
+aiosqlite>=0.20.0
+Pillow>=10.0.0

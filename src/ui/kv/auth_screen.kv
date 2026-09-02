@@ -1,0 +1,235 @@
+#:kivy 2.3.0
+#:import dp kivy.metrics.dp
+
+<BrowserModeContent>:
+    orientation: "vertical"
+    spacing: dp(12)
+    size_hint_y: None
+    height: self.minimum_height
+
+    MDLabel:
+        text: "получите токен kate mobile если вы авторизованы в браузере и скопируйте адресную строку после авторизации"
+        font_style: "Body"
+        role: "small"
+        theme_text_color: "Secondary"
+        size_hint_y: None
+        height: dp(42)
+
+    MDButton:
+        style: "tonal"
+        size_hint_x: 1
+        on_release: root.auth_screen.open_browser() if root.auth_screen else None
+        MDButtonIcon:
+            icon: "open-in-new"
+        MDButtonText:
+            text: "Открыть страницу разрешения в браузере"
+            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+    MDLabel:
+        text: "вставьте ранее скопированную адресную строку или просто любой токен vk1.a..."
+        font_style: "Body"
+        role: "small"
+        theme_text_color: "Secondary"
+        size_hint_y: None
+        height: dp(36)
+
+    MDTextField:
+        mode: "outlined"
+        size_hint_x: 1
+        text: root.auth_screen.vm.browser_input if root.auth_screen else ""
+        on_text: root.auth_screen.vm.browser_input = self.text if root.auth_screen else ""
+        MDTextFieldLeadingIcon:
+            icon: "link-variant"
+        MDTextFieldHintText:
+            text: "https://oauth...#access_token=vk1.a..."
+
+
+<CookiesModeContent>:
+    orientation: "vertical"
+    spacing: dp(12)
+    size_hint_y: None
+    height: self.minimum_height
+
+    MDLabel:
+        text: "Вставьте значения cookie из браузера (F12 -> Application/Storage -> Cookies -> vk.com):"
+        font_style: "Body"
+        role: "small"
+        theme_text_color: "Secondary"
+        size_hint_y: None
+        height: dp(40)
+
+    MDTextField:
+        mode: "outlined"
+        size_hint_x: 1
+        text: root.auth_screen.vm.remixsid_input if root.auth_screen else ""
+        on_text: root.auth_screen.vm.remixsid_input = self.text if root.auth_screen else ""
+        MDTextFieldLeadingIcon:
+            icon: "cookie"
+        MDTextFieldHintText:
+            text: "remixsid"
+
+    MDTextField:
+        mode: "outlined"
+        size_hint_x: 1
+        text: root.auth_screen.vm.p_input if root.auth_screen else ""
+        on_text: root.auth_screen.vm.p_input = self.text if root.auth_screen else ""
+        MDTextFieldLeadingIcon:
+            icon: "shield-account"
+        MDTextFieldHintText:
+            text: "p"
+
+
+<WebModeContent>:
+    orientation: "vertical"
+    spacing: dp(12)
+    padding: [0, dp(24), 0, dp(16)]
+    size_hint_y: None
+    height: self.minimum_height
+
+    MDLabel:
+        text: "недоступно на desktop"
+        font_style: "Title"
+        role: "medium"
+        theme_text_color: "Secondary"
+        halign: "center"
+        size_hint_y: None
+        height: dp(40)
+
+
+<AuthScreen>:
+    md_bg_color: self.theme_cls.backgroundColor
+
+    ScrollView:
+        do_scroll_x: False
+        do_scroll_y: True
+
+        BoxLayout:
+            orientation: "vertical"
+            padding: [dp(20), dp(24)]
+            spacing: dp(14)
+            size_hint_y: None
+            height: self.minimum_height
+            pos_hint: {"center_x": 0.5}
+
+            # Top Spacer
+            Widget:
+                size_hint_y: None
+                height: dp(16)
+
+            # Logo & Title
+            BoxLayout:
+                orientation: "vertical"
+                size_hint_y: None
+                height: dp(84)
+                spacing: dp(4)
+
+                MDLabel:
+                    text: "VK IMPACT"
+                    halign: "center"
+                    theme_text_color: "Primary"
+                    font_style: "Headline"
+                    role: "large"
+                    bold: True
+
+                MDLabel:
+                    text: "Быстрый веб-клиент ВКонтакте"
+                    halign: "center"
+                    theme_text_color: "Secondary"
+                    font_style: "Body"
+                    role: "medium"
+
+            # Mode Switch Tabs
+            BoxLayout:
+                orientation: "horizontal"
+                size_hint_y: None
+                height: dp(42)
+                size_hint_x: 0.98
+                pos_hint: {"center_x": 0.5}
+                spacing: dp(6)
+
+                MDButton:
+                    style: "filled" if root.vm.auth_mode == "browser" else "tonal"
+                    size_hint_x: 0.38
+                    on_release: root.switch_mode("browser")
+                    MDButtonText:
+                        text: "Браузер"
+                        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+                MDButton:
+                    style: "filled" if root.vm.auth_mode == "cookies" else "tonal"
+                    size_hint_x: 0.38
+                    on_release: root.switch_mode("cookies")
+                    MDButtonText:
+                        text: "Cookies"
+                        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+                MDButton:
+                    style: "filled" if root.vm.auth_mode == "web" else "tonal"
+                    size_hint_x: 0.24
+                    on_release: root.switch_mode("web")
+                    MDButtonText:
+                        text: "Веб"
+                        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+            # Error Banner
+            MDLabel:
+                text: root.vm.error_message
+                color: (0.9, 0.2, 0.2, 1)
+                halign: "center"
+                size_hint_y: None
+                height: dp(36) if root.vm.error_message else 0
+                opacity: 1 if root.vm.error_message else 0
+                font_style: "Body"
+                role: "small"
+
+            # Main Card with clean Dynamic Mode Container
+            MDCard:
+                orientation: "vertical"
+                padding: [dp(20), dp(20)]
+                spacing: dp(14)
+                size_hint_y: None
+                height: self.minimum_height
+                size_hint_x: 0.98
+                pos_hint: {"center_x": 0.5}
+                style: "elevated"
+
+                BoxLayout:
+                    id: mode_container
+                    orientation: "vertical"
+                    size_hint_y: None
+                    height: self.minimum_height
+
+                Widget:
+                    size_hint_y: None
+                    height: dp(6) if root.vm.auth_mode != "web" else 0
+
+                # Submit Button (hidden in web mode)
+                MDButton:
+                    style: "filled"
+                    size_hint_x: 1
+                    size_hint_y: None
+                    height: dp(44) if root.vm.auth_mode != "web" else 0
+                    pos_hint: {"center_x": 0.5}
+                    on_release: root.on_login_pressed()
+                    disabled: root.vm.is_loading or root.vm.auth_mode == "web"
+                    opacity: 0 if root.vm.auth_mode == "web" else 1
+
+                    MDButtonText:
+                        text: "Обменять Cookies на токен" if root.vm.auth_mode == "cookies" else "Войти"
+                        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+            # Loading Indicator
+            BoxLayout:
+                size_hint_y: None
+                height: dp(48)
+                pos_hint: {"center_x": 0.5}
+                opacity: 1 if root.vm.is_loading else 0
+
+                MDCircularProgressIndicator:
+                    size_hint: (None, None)
+                    size: (dp(36), dp(36))
+                    pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+            Widget:
+                size_hint_y: None
+                height: dp(20)
