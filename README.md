@@ -31,19 +31,61 @@ VK_IMPACT/
 
 ---
 
-## Запуск приложения
+## Установка и запуск
 
-1. Установка зависимостей:
-   ```bash
-   pip install -r requirements.txt
+> **Важно**: Команда `python` / `python3` традиционно используется в окружениях **Linux** и **macOS**. В операционной системе **Windows** стандартным и рекомендуемым способом запуска является Python Launcher — утилита `py` с явным указанием флага версии (например, `-3.13` или `-3`).
+
+### 1. Запуск в Windows (рекомендуемый способ)
+
+1. **Проверка установленной версии Python**:
+   ```cmd
+   py -3.13 --version
+   ```
+   *или краткий флаг версии:*
+   ```cmd
+   py -3.13 -V
+   ```
+   *(Также можно просмотреть все установленные на компьютере версии Python: `py --list`)*
+
+2. **Установка зависимостей проекта**:
+   ```cmd
+   py -3.13 -m pip install -r requirements.txt
    ```
 
-2. Запуск тестов архитектуры:
-   ```bash
-   python tests/test_architecture.py
+3. **Запуск автоматических тестов**:
+   ```cmd
+   py -3.13 tests/test_architecture.py
+   py -3.13 tests/test_folders_and_logs.py
+   py -3.13 tests/test_archive_and_users.py
    ```
 
-3. Запуск приложения:
-   ```bash
-   python main.py
+4. **Запуск приложения**:
+   ```cmd
+   py -3.13 main.py
    ```
+   *(Если версия 3.13 установлена по умолчанию, допустим запуск: `py -3 main.py` или просто `py main.py`)*
+
+---
+
+### 2. Запуск в Linux / macOS
+
+1. **Проверка версии**:
+   ```bash
+   python3 --version
+   ```
+
+2. **Установка зависимостей**:
+   ```bash
+   python3 -m pip install -r requirements.txt
+   ```
+
+3. **Запуск тестов**:
+   ```bash
+   python3 tests/test_architecture.py
+   ```
+
+4. **Запуск приложения**:
+   ```bash
+   python3 main.py
+   ```
+
