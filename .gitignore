@@ -1,0 +1,27 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Kivy / KivyMD logs and caches
+.kivy/
+.cache/
+
+# Local database and sessions
+*.db
+*.enc
+.secret.key
+
+# Packaging
+build/
+dist/
+*.spec
+.buildozer/
+bin/

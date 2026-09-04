@@ -19,34 +19,35 @@ def test_folders_filtering():
     # Sample dialog items
     d_user = VKDialogItem(peer_id=12345, title="Иван Иванов")
     d_chat = VKDialogItem(peer_id=2000000005, title="Беседа одноклассников")
-    d_group = VKDialogItem(peer_id=-98765, title="Паблик Мемы")
-    d_channel = VKDialogItem(peer_id=-112233, title="Новостной канал")
+    d_group = VKDialogItem(peer_id=-98765, title="Паблик Мемы", is_channel=False)
+    d_channel = VKDialogItem(peer_id=-112233, title="Типичный ролевик", is_channel=True)
     
     dialogs = [d_user, d_chat, d_group, d_channel]
 
-    # Rule 1: 'system_all' or None -> returns all dialogs
+    # Rule 1: 'system_all' or None -> returns all dialogs (including channels)
     assert len(repo.filter_dialogs(dialogs, "system_all")) == 4
     assert len(repo.filter_dialogs(dialogs, None)) == 4
 
-    # Rule 2: 'system_chats' -> peer_id > 2000000000
+    # Rule 2: 'system_chats' -> peer_id > 2000000000 and not is_channel
     chats = repo.filter_dialogs(dialogs, "system_chats")
     assert len(chats) == 1
     assert chats[0].peer_id == 2000000005
 
-    # Rule 3: 'system_pm' -> 0 < peer_id < 2000000000
+    # Rule 3: 'system_pm' -> 0 < peer_id < 2000000000 and not is_channel
     pm = repo.filter_dialogs(dialogs, "system_pm")
     assert len(pm) == 1
     assert pm[0].peer_id == 12345
 
-    # Rule 4: 'system_groups' -> peer_id < 0
+    # Rule 4: 'system_groups' -> peer_id < 0 and not is_channel
     groups = repo.filter_dialogs(dialogs, "system_groups")
-    assert len(groups) == 2
-    assert all(g.peer_id < 0 for g in groups)
+    assert len(groups) == 1
+    assert groups[0].peer_id == -98765
 
-    # Rule 5: 'system_channels' -> channel heuristic
+    # Rule 5: 'system_channels' -> is_channel == True
     channels = repo.filter_dialogs(dialogs, "system_channels")
     assert len(channels) == 1
-    assert channels[0].title == "Новостной канал"
+    assert channels[0].title == "Типичный ролевик"
+    assert channels[0].is_channel is True
 
     # Rule 6: 'system_archive' and 'system_business' -> empty for now
     assert len(repo.filter_dialogs(dialogs, "system_archive")) == 0

@@ -17,7 +17,7 @@ class AppConfig:
     
     # VK API Settings
     VK_API_VERSION: str = "5.199"
-    VK_API_BASE_URL: str = "https://api.vk.com/method/"
+    VK_API_BASE_URL: str = "https://api.vk.ru/method/"
     VK_OAUTH_URL: str = "https://oauth.vk.com/token"
     VK_AUTHORIZE_URL: str = "https://oauth.vk.com/authorize"
     

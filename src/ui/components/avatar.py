@@ -1,12 +1,29 @@
-"""High-performance Avatar component with initials fallback and memory caching."""
+import os
+from pathlib import Path
 from kivy.uix.relativelayout import RelativeLayout
 from kivy.properties import StringProperty, BooleanProperty, NumericProperty, ListProperty
 from src.data.cache.media_cache import media_cache
 from src.utils.formatters import get_avatar_color, get_user_initials
 
+# Resolve oreol image path
+_BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+_EXTRA_STYLES_DIR = _BASE_DIR / "assets" / "extra_styles"
+_DEFAULT_OREOL = ""
+for _cand in [
+    _EXTRA_STYLES_DIR / "zephyr_oreol.png",
+    _EXTRA_STYLES_DIR / "zephyr-oreol.png",
+    _BASE_DIR / "zephyr_oreol.png",
+    _BASE_DIR / "zephyr-oreol.png"
+]:
+    if _cand.exists():
+        _DEFAULT_OREOL = _cand.as_posix()
+        break
+if not _DEFAULT_OREOL:
+    _DEFAULT_OREOL = (_EXTRA_STYLES_DIR / "zephyr_oreol.png").as_posix()
+
 
 class CircularAvatar(RelativeLayout):
-    """Circular avatar with instant initials rendering and non-blocking image loading."""
+    """Circular avatar with instant initials rendering, oreol support, and non-blocking image loading."""
     
     source = StringProperty("")
     local_source = StringProperty("")
@@ -15,6 +32,8 @@ class CircularAvatar(RelativeLayout):
     size_dp = NumericProperty(48)
     is_online = BooleanProperty(False)
     peer_id = NumericProperty(0)
+    impact_style = StringProperty("")
+    oreol_source = StringProperty(_DEFAULT_OREOL)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

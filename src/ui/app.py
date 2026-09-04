@@ -21,6 +21,7 @@ from src.ui.components.message_bubble import MessageBubble
 from src.ui.components.dialog_item import DialogItemRow
 from src.ui.components.dockbar import DockBar
 from src.ui.components.folder_chip import FolderChip
+from src.ui.components.scroll_bottom_fab import ScrollBottomFab
 from src.ui.screens.auth_screen import AuthScreen
 from src.ui.screens.dialogs_screen import DialogsScreen
 from src.ui.screens.chat_screen import ChatScreen

@@ -9,6 +9,7 @@ from kivymd.uix.textfield import MDTextField, MDTextFieldHintText
 from src.ui.components.folder_chip import FolderChip
 from src.domain.dialogs_viewmodel import DialogsViewModel
 from src.core.constants import ScreenName
+from src.core.logger import logger
 
 
 class DialogsScreen(MDScreen):
@@ -35,20 +36,50 @@ class DialogsScreen(MDScreen):
         else:
             self.vm._apply_folder_filter()
 
-    def open_chat(self, peer_id: int, title: str, avatar_url: str = ""):
+    def open_chat(self, peer_id: int, title: str, avatar_url: str = "", is_channel: bool = False, is_muted: bool = False, unread_count: int = 0):
         """Navigates to the chat screen."""
         if not self.manager:
             return
             
         chat_screen = self.manager.get_screen(ScreenName.CHAT)
         if chat_screen:
-            chat_screen.setup_chat(peer_id=peer_id, title=title, avatar_url=avatar_url)
+            chat_screen.setup_chat(peer_id=peer_id, title=title, avatar_url=avatar_url, is_channel=is_channel, is_muted=is_muted, unread_count=unread_count)
             self.manager.current = ScreenName.CHAT
 
     def on_rv_scroll(self, scroll_y: float):
         """Called when user scrolls near the bottom of a scrollable conversations list."""
-        if scroll_y <= 0.08 and len(self.vm.dialogs) >= 15 and not self.vm.is_loading_more and self.vm.has_more:
-            self.vm.load_more_dialogs()
+        if scroll_y <= 0.20 and len(self.vm.dialogs) > 0 and not self.vm.is_loading_more and self.vm.has_more:
+            rv = self.ids.get("rv_dialogs")
+            old_count = len(self.vm.dialogs)
+            logger.info("Triggering load_more_dialogs: scroll_y=%.3f, count=%d", rv.scroll_y if rv else scroll_y, len(self.vm.dialogs))
+
+            def _prepare_scroll(old_c: int, new_c: int):
+                if new_c > old_c and rv:
+                    from kivy.metrics import dp
+                    item_h = dp(76)
+                    h_old = old_c * item_h
+                    h_new = new_c * item_h
+                    v_h = rv.height or dp(600)
+                    if h_old > v_h and h_new > v_h:
+                        curr_sy = rv.scroll_y
+                        offset_top = (1.0 - curr_sy) * (h_old - v_h)
+                        new_scroll_y = max(0.0, min(1.0, 1.0 - (offset_top / (h_new - v_h))))
+                        if getattr(rv, "_anim_y", None):
+                            rv._anim_y.stop(rv)
+                            rv._anim_y = None
+                        rv.scroll_y = new_scroll_y
+                        if hasattr(rv, "_update_effect_y_bounds"):
+                            rv._update_effect_y_bounds()
+                        Clock.schedule_once(lambda dt: setattr(rv, "scroll_y", new_scroll_y), 0)
+
+            self.vm.load_more_dialogs(on_prepare_scroll=_prepare_scroll)
+
+    def _on_folder_selected(self, folder_id: str):
+        """Selects a folder and resets list scroll position to top."""
+        self.vm.select_folder(folder_id)
+        rv = self.ids.get("rv_dialogs")
+        if rv:
+            Clock.schedule_once(lambda dt: setattr(rv, "scroll_y", 1.0), 0)
 
     def _render_folder_chips(self, *args):
         """Renders folder chips inside the horizontal scroll container."""
@@ -69,7 +100,7 @@ class DialogsScreen(MDScreen):
                 is_active=is_active,
                 is_system=f["is_system"]
             )
-            chip.bind(on_release=lambda instance, fid=f_id: self.vm.select_folder(fid))
+            chip.bind(on_release=lambda instance, fid=f_id: self._on_folder_selected(fid))
             container.add_widget(chip)
 
         # Add '+' button at the end for custom folder creation

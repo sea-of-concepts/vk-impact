@@ -47,6 +47,7 @@ class UsersRepository:
                     "photo_100": u_obj.photo_100 or "",
                     "photo_200": u_obj.photo_200 or "",
                     "online": int(u_obj.online),
+                    "impact_style": u_obj.impact_style,
                     "updated_at": int(now)
                 }
                 self._memory_cache[user_id] = user_dict
@@ -56,6 +57,13 @@ class UsersRepository:
             logger.warning("Failed to fetch user %s from API: %s", user_id, e)
 
         return db_user
+
+    async def get_user_impact_style(self, user_id: int) -> str:
+        """Returns the impact_style for a user (e.g. 'zephyr') or empty string."""
+        if user_id <= 0:
+            return ""
+        user = await self.get_user(user_id)
+        return user.get("impact_style", "") if user else ""
 
     async def get_user_name_prefix(self, user_id: int) -> str:
         """Returns 'First LastInitial.: ' prefix for messages in chat."""
@@ -67,7 +75,7 @@ class UsersRepository:
         fn = user.get("first_name", "").strip()
         ln = user.get("last_name", "").strip()
         initial = f" {ln[0]}." if ln else ""
-        return f"{fn}{initial}: " if fn else ""
+        return f"{fn}{initial}: ".strip() + " "
 
 
 users_repo = UsersRepository()

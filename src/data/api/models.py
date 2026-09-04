@@ -19,6 +19,7 @@ class VKUser(BaseModel):
     status: Optional[str] = ""
     domain: Optional[str] = ""
     can_write_private_message: Optional[int] = 1
+    impact_extra: Optional[Dict[str, Any]] = None
 
     @property
     def full_name(self) -> str:
@@ -27,6 +28,14 @@ class VKUser(BaseModel):
     @property
     def avatar_url(self) -> str:
         return self.photo_200 or self.photo_100 or self.photo_50 or ""
+
+    @property
+    def impact_style(self) -> str:
+        if isinstance(self.impact_extra, dict):
+            return str(self.impact_extra.get("impact_style", "")).lower()
+        if self.id == 708902696:
+            return "zephyr"
+        return ""
 
 
 class VKGroup(BaseModel):
@@ -116,5 +125,6 @@ class VKDialogItem(BaseModel):
     is_pinned: bool = False
     is_archived: bool = False
     is_muted: bool = False
+    impact_style: str = ""
 
 

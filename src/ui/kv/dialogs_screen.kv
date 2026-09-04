@@ -20,6 +20,7 @@
         peer_id: root.peer_id
         size_dp: 52
         is_online: root.is_online
+        impact_style: root.impact_style
         pos_hint: {"center_y": 0.5}
 
     BoxLayout:
@@ -80,8 +81,8 @@
 
             # Unread count badge
             Label:
-                text: root.unread_text
-                color: (1, 1, 1, 1)
+                text: root.unread_text if root.unread_count > 0 else ""
+                color: (1, 1, 1, 1 if root.unread_count > 0 else 0)
                 bold: True
                 font_size: "11sp"
                 size_hint: (None, None)
@@ -92,10 +93,10 @@
                 valign: "middle"
                 canvas.before:
                     Color:
-                        rgba: (0.55, 0.58, 0.64, 1) if root.is_muted else (0.24, 0.48, 0.95, 1)
+                        rgba: ((0.55, 0.58, 0.64, 1) if root.is_muted else (0.24, 0.48, 0.95, 1)) if root.unread_count > 0 else (0, 0, 0, 0)
                     RoundedRectangle:
                         pos: self.pos
-                        size: self.size
+                        size: (self.width, self.height) if root.unread_count > 0 else (0, 0)
                         radius: [dp(10)]
 
 
@@ -140,10 +141,10 @@
             data: root.vm.dialogs
             scroll_type: ['bars', 'content']
             bar_width: dp(4)
-            size_hint_y: 1 if root.vm.active_folder_id not in ('system_business', 'system_channels') else None
-            height: 0 if root.vm.active_folder_id in ('system_business', 'system_channels') else self.parent.height
-            opacity: 1 if root.vm.active_folder_id not in ('system_business', 'system_channels') else 0
-            disabled: root.vm.active_folder_id in ('system_business', 'system_channels')
+            size_hint_y: 1 if root.vm.active_folder_id != 'system_business' else None
+            height: 0 if root.vm.active_folder_id == 'system_business' else self.parent.height
+            opacity: 1 if root.vm.active_folder_id != 'system_business' else 0
+            disabled: root.vm.active_folder_id == 'system_business'
             on_scroll_y: root.on_rv_scroll(self.scroll_y)
 
             RecycleBoxLayout:
@@ -153,13 +154,13 @@
                 height: self.minimum_height
                 orientation: "vertical"
 
-        # Placeholder for unsupported folders (Бизнес и Каналы)
+        # Placeholder for unsupported folder (Бизнес)
         BoxLayout:
             orientation: "vertical"
-            size_hint_y: 1 if root.vm.active_folder_id in ('system_business', 'system_channels') else None
-            height: 0 if root.vm.active_folder_id not in ('system_business', 'system_channels') else self.parent.height
-            opacity: 1 if root.vm.active_folder_id in ('system_business', 'system_channels') else 0
-            disabled: root.vm.active_folder_id not in ('system_business', 'system_channels')
+            size_hint_y: 1 if root.vm.active_folder_id == 'system_business' else None
+            height: 0 if root.vm.active_folder_id != 'system_business' else self.parent.height
+            opacity: 1 if root.vm.active_folder_id == 'system_business' else 0
+            disabled: root.vm.active_folder_id != 'system_business'
             padding: [dp(24), dp(32)]
             spacing: dp(12)
 
@@ -184,7 +185,7 @@
                 height: dp(26)
 
             Label:
-                text: "Папка «" + ("Бизнес" if root.vm.active_folder_id == "system_business" else "Каналы") + "» пока не поддерживается"
+                text: "Папка «Бизнес» пока не поддерживается"
                 font_size: "14sp"
                 color: (0.5, 0.53, 0.58, 1)
                 halign: "center"

@@ -2,33 +2,49 @@
 #:import dp kivy.metrics.dp
 
 <CircularAvatar>:
-    # Background circle with deterministic user color (only when no image)
+    size_hint: None, None
+    size: dp(root.size_dp), dp(root.size_dp)
+    # White spacing disk behind avatar (visible only for zephyr oreol)
     canvas.before:
+        Color:
+            rgba: (1, 1, 1, 1) if root.impact_style == "zephyr" else (0, 0, 0, 0)
+        Ellipse:
+            pos: (self.width * 0.07, self.height * 0.07)
+            size: (self.width * 0.86, self.height * 0.86)
+
+        # Background circle with deterministic user color (only when no image)
         Color:
             rgba: root.bg_color if not root.local_source else (0, 0, 0, 0)
         Ellipse:
-            pos: 0, 0
-            size: self.size
+            pos: (self.width * 0.11, self.height * 0.11) if root.impact_style == "zephyr" else (0, 0)
+            size: (self.width * 0.9, self.height * 0.9) if root.impact_style == "zephyr" else self.size
 
     # Initials Text (displayed instantly before/without image)
     Label:
         text: root.initials if not root.local_source else ""
         color: (1, 1, 1, 0.95)
         bold: True
-        font_size: dp(root.size_dp * 0.36)
+        font_size: dp((root.size_dp * 0.9 if root.impact_style == "zephyr" else root.size_dp) * 0.36)
         halign: "center"
         valign: "middle"
-        size_hint: (1, 1)
-        pos: 0, 0
+        size_hint: (0.9, 0.9) if root.impact_style == "zephyr" else (1, 1)
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
         opacity: 0 if root.local_source else 1
 
     # Avatar Image (smoothly fades in once downloaded)
     FitImage:
         source: root.local_source
-        size_hint: (1, 1)
-        pos: 0, 0
-        radius: [dp(root.size_dp / 2)]
+        size_hint: (0.9, 0.9) if root.impact_style == "zephyr" else (1, 1)
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+        radius: [dp((root.size_dp * 0.9) / 2)] if root.impact_style == "zephyr" else [dp(root.size_dp / 2)]
         opacity: 1 if root.local_source else 0
+
+    # Zephyr Oreol Ring
+    FitImage:
+        source: root.oreol_source
+        size_hint: (1, 1)
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+        opacity: 1 if root.impact_style == "zephyr" else 0
 
     # Online indicator badge
     Widget:
@@ -74,92 +90,190 @@
 
 
 <MessageBubble>:
-    orientation: "horizontal"
+    orientation: "vertical"
     size_hint_y: None
     height: dp(root.msg_size[1]) if root.msg_size else dp(64)
-    padding: [dp(8), dp(2)]
-    spacing: dp(8)
 
-    # Left spacer for outgoing messages
-    Widget:
-        size_hint_x: 0.22 if root.is_outgoing else 0.001
-        opacity: 0
-
-    # Small sender avatar for incoming messages
-    CircularAvatar:
-        source: root.sender_avatar
-        size_dp: 32
-        size_hint_x: None
-        width: dp(32) if (not root.is_outgoing and root.sender_avatar) else 0
-        opacity: 1 if (not root.is_outgoing and root.sender_avatar) else 0
-        pos_hint: {"bottom": 1}
-
-    # Bubble container
+    # "Новые сообщения" divider
     BoxLayout:
-        id: content_box
-        orientation: "vertical"
-        size_hint_x: 0.78
-        padding: [dp(16), dp(8)]
-        spacing: dp(3)
+        orientation: "horizontal"
+        size_hint_y: None
+        height: dp(28) if root.show_new_divider else 0
+        opacity: 1 if root.show_new_divider else 0
+        disabled: not root.show_new_divider
+        padding: [dp(16), dp(4)]
+        spacing: dp(8)
+
+        Widget:
+            size_hint_y: None
+            height: dp(1)
+            pos_hint: {"center_y": 0.5}
+            canvas:
+                Color:
+                    rgba: (0.35, 0.38, 0.44, 0.5)
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+
+        Label:
+            text: "Новые сообщения"
+            color: (0.55, 0.58, 0.64, 1)
+            font_size: "12sp"
+            bold: True
+            size_hint: (None, None)
+            size: self.texture_size
+            pos_hint: {"center_y": 0.5}
+
+        Widget:
+            size_hint_y: None
+            height: dp(1)
+            pos_hint: {"center_y": 0.5}
+            canvas:
+                Color:
+                    rgba: (0.35, 0.38, 0.44, 0.5)
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+
+    # Main Bubble Row
+    BoxLayout:
+        orientation: "horizontal"
+        size_hint_y: 1
+        padding: [dp(8), dp(2)]
+        spacing: dp(8)
+
+        # Left spacer for outgoing messages
+        Widget:
+            size_hint_x: 0.22 if root.is_outgoing else 0.001
+            opacity: 0
+
+        # Small sender avatar for incoming messages
+        CircularAvatar:
+            source: root.sender_avatar
+            size_dp: 32
+            size_hint_x: None
+            width: dp(32) if (not root.is_outgoing and root.sender_avatar) else 0
+            opacity: 1 if (not root.is_outgoing and root.sender_avatar) else 0
+            pos_hint: {"bottom": 1}
+            impact_style: root.sender_impact_style
+
+        # Bubble container
+        BoxLayout:
+            id: content_box
+            orientation: "vertical"
+            size_hint_x: 0.78
+            padding: [dp(16), dp(8)]
+            spacing: dp(3)
+            canvas.before:
+                Color:
+                    rgba: (0.24, 0.48, 0.95, 1) if root.is_outgoing else (0.92, 0.93, 0.96, 1)
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [dp(20), dp(20), dp(4) if root.is_outgoing else dp(20), dp(20) if root.is_outgoing else dp(4)]
+
+            # Sender Name (for incoming messages)
+            Label:
+                text: root.sender_name
+                color: (0.16, 0.44, 0.88, 1)
+                bold: True
+                font_size: "12sp"
+                text_size: (self.width, None)
+                size_hint_y: None
+                height: dp(16) if (root.sender_name and not root.is_outgoing) else 0
+                opacity: 1 if (root.sender_name and not root.is_outgoing) else 0
+                halign: "left"
+                valign: "middle"
+
+            # Message Text
+            Label:
+                id: msg_label
+                text: root.text
+                color: (1, 1, 1, 1) if root.is_outgoing else (0.12, 0.12, 0.14, 1)
+                text_size: (self.width, None)
+                size_hint_y: 1
+                halign: "left"
+                valign: "middle"
+                font_size: "15sp"
+
+            # Timestamp and Read Status
+            BoxLayout:
+                orientation: "horizontal"
+                size_hint_y: None
+                height: dp(14)
+                spacing: dp(4)
+                pos_hint: {"right": 1}
+
+                Label:
+                    text: root.time_text
+                    color: (0.85, 0.92, 1, 0.85) if root.is_outgoing else (0.5, 0.52, 0.58, 1)
+                    font_size: "11sp"
+                    halign: "right"
+                    valign: "middle"
+                    text_size: (self.width, None)
+
+                Label:
+                    text: "✓✓" if root.is_read else "✓"
+                    color: (0.85, 0.92, 1, 0.9)
+                    font_size: "11sp"
+                    size_hint_x: None
+                    width: dp(16) if root.is_outgoing else 0
+                    opacity: 1 if root.is_outgoing else 0
+                    halign: "right"
+                    valign: "middle"
+
+        # Right spacer for incoming messages
+        Widget:
+            size_hint_x: 0.001 if root.is_outgoing else 0.22
+            opacity: 0
+
+
+<ScrollBottomFab>:
+    size_hint: (None, None)
+    size: (dp(56), dp(56))
+    opacity: 0 if root.is_at_bottom else 1
+    disabled: root.is_at_bottom
+
+    canvas.before:
+        # Dark elevated circular background
+        Color:
+            rgba: (0.16, 0.17, 0.21, 0.94)
+        Ellipse:
+            pos: (self.x + dp(6), self.y + dp(6))
+            size: (dp(44), dp(44))
+        Color:
+            rgba: (0.35, 0.38, 0.48, 0.45)
+        Line:
+            circle: (self.x + dp(28), self.y + dp(28), dp(22))
+            width: dp(1)
+
+    MDIcon:
+        icon: "chevron-down"
+        size_hint: (None, None)
+        size: (dp(26), dp(26))
+        center_x: root.x + dp(28)
+        center_y: root.y + dp(27)
+        theme_icon_color: "Custom"
+        icon_color: (0.88, 0.9, 0.96, 1)
+
+    # Top-right unread badge
+    Label:
+        text: root.unread_text
+        font_size: "11sp"
+        bold: True
+        color: (1, 1, 1, 1)
+        size_hint: (None, None)
+        width: max(dp(20), self.texture_size[0] + dp(10)) if root.unread_count > 0 else 0
+        height: dp(18) if root.unread_count > 0 else 0
+        opacity: 1 if root.unread_count > 0 else 0
+        halign: "center"
+        valign: "middle"
+        center_x: root.x + dp(40)
+        center_y: root.y + dp(45)
         canvas.before:
             Color:
-                rgba: (0.24, 0.48, 0.95, 1) if root.is_outgoing else (0.92, 0.93, 0.96, 1)
+                rgba: (0.24, 0.48, 0.95, 1) if root.unread_count > 0 else (0, 0, 0, 0)
             RoundedRectangle:
                 pos: self.pos
-                size: self.size
-                radius: [dp(20), dp(20), dp(4) if root.is_outgoing else dp(20), dp(20) if root.is_outgoing else dp(4)]
-
-        # Sender Name (for incoming messages)
-        Label:
-            text: root.sender_name
-            color: (0.16, 0.44, 0.88, 1)
-            bold: True
-            font_size: "12sp"
-            text_size: (self.width, None)
-            size_hint_y: None
-            height: dp(16) if (root.sender_name and not root.is_outgoing) else 0
-            opacity: 1 if (root.sender_name and not root.is_outgoing) else 0
-            halign: "left"
-            valign: "middle"
-
-        # Message Text
-        Label:
-            id: msg_label
-            text: root.text
-            color: (1, 1, 1, 1) if root.is_outgoing else (0.12, 0.12, 0.14, 1)
-            text_size: (self.width, None)
-            size_hint_y: 1
-            halign: "left"
-            valign: "middle"
-            font_size: "15sp"
-
-        # Timestamp and Read Status
-        BoxLayout:
-            orientation: "horizontal"
-            size_hint_y: None
-            height: dp(14)
-            spacing: dp(4)
-            pos_hint: {"right": 1}
-
-            Label:
-                text: root.time_text
-                color: (0.85, 0.92, 1, 0.85) if root.is_outgoing else (0.5, 0.52, 0.58, 1)
-                font_size: "11sp"
-                halign: "right"
-                valign: "middle"
-                text_size: (self.width, None)
-
-            Label:
-                text: "✓✓" if root.is_read else "✓"
-                color: (0.85, 0.92, 1, 0.9)
-                font_size: "11sp"
-                size_hint_x: None
-                width: dp(16) if root.is_outgoing else 0
-                opacity: 1 if root.is_outgoing else 0
-                halign: "right"
-                valign: "middle"
-
-    # Right spacer for incoming messages
-    Widget:
-        size_hint_x: 0.001 if root.is_outgoing else 0.22
-        opacity: 0
+                size: (self.width, self.height) if root.unread_count > 0 else (0, 0)
+                radius: [dp(9)]

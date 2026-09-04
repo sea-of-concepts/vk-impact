@@ -94,16 +94,16 @@ class FoldersRepository:
             return active_dialogs
 
         if folder_id == "system_chats":
-            return [d for d in active_dialogs if d.peer_id > 2000000000]
+            return [d for d in active_dialogs if not d.is_channel and d.peer_id > 2000000000]
 
         if folder_id == "system_pm":
-            return [d for d in active_dialogs if 0 < d.peer_id < 2000000000]
+            return [d for d in active_dialogs if not d.is_channel and 0 < d.peer_id < 2000000000]
 
         if folder_id == "system_groups":
-            return [d for d in active_dialogs if d.peer_id < 0]
+            return [d for d in active_dialogs if not d.is_channel and d.peer_id < 0]
 
         if folder_id == "system_channels":
-            return [d for d in active_dialogs if d.peer_id < 0 and ("канал" in d.title.lower() or "channel" in d.title.lower())]
+            return [d for d in active_dialogs if d.is_channel or (d.peer_id < 0 and ("канал" in d.title.lower() or "channel" in d.title.lower()))]
 
         if folder_id == "system_business":
             return []

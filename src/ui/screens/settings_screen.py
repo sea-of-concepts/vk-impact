@@ -9,7 +9,7 @@ from src.data.repositories.auth_repo import auth_repo
 class SettingsScreen(MDScreen):
     """View displaying application settings, version, and account management."""
 
-    app_version = StringProperty("0.0.2")
+    app_version = StringProperty("0.0.3")
     app_name = StringProperty(config.APP_NAME)
     user_id = StringProperty("")
 

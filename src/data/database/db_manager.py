@@ -37,6 +37,8 @@ class DatabaseManager:
                     is_pinned INTEGER DEFAULT 0,
                     is_archived INTEGER DEFAULT 0,
                     is_muted INTEGER DEFAULT 0,
+                    is_channel INTEGER DEFAULT 0,
+                    impact_style TEXT DEFAULT '',
                     updated_at INTEGER
                 )
             """)
@@ -75,6 +77,7 @@ class DatabaseManager:
                     photo_100 TEXT,
                     photo_200 TEXT,
                     online INTEGER DEFAULT 0,
+                    impact_style TEXT DEFAULT '',
                     updated_at INTEGER DEFAULT 0
                 )
             """)
@@ -90,6 +93,18 @@ class DatabaseManager:
                 pass
             try:
                 await db.execute("ALTER TABLE dialogs ADD COLUMN is_muted INTEGER DEFAULT 0")
+            except Exception:
+                pass
+            try:
+                await db.execute("ALTER TABLE dialogs ADD COLUMN is_channel INTEGER DEFAULT 0")
+            except Exception:
+                pass
+            try:
+                await db.execute("ALTER TABLE dialogs ADD COLUMN impact_style TEXT DEFAULT ''")
+            except Exception:
+                pass
+            try:
+                await db.execute("ALTER TABLE users ADD COLUMN impact_style TEXT DEFAULT ''")
             except Exception:
                 pass
             try:
@@ -121,16 +136,56 @@ class DatabaseManager:
                 int(d.get("is_pinned", False)),
                 int(d.get("is_archived", False)),
                 int(d.get("is_muted", False)),
+                int(d.get("is_channel", False)),
+                d.get("impact_style", ""),
                 d.get("last_message_time", 0)
             )
             for d in dialogs
         ]
         async with aiosqlite.connect(self.db_path) as db:
             await db.executemany("""
-                INSERT OR REPLACE INTO dialogs 
-                (peer_id, title, avatar_url, last_message_text, last_message_time, unread_count, is_online, is_outgoing, is_read, is_pinned, is_archived, is_muted, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO dialogs 
+                (peer_id, title, avatar_url, last_message_text, last_message_time, unread_count, is_online, is_outgoing, is_read, is_pinned, is_archived, is_muted, is_channel, impact_style, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(peer_id) DO UPDATE SET
+                    title = excluded.title,
+                    avatar_url = excluded.avatar_url,
+                    last_message_text = excluded.last_message_text,
+                    last_message_time = excluded.last_message_time,
+                    unread_count = CASE 
+                        WHEN dialogs.is_read = 1 AND excluded.last_message_time <= dialogs.last_message_time THEN 0 
+                        ELSE excluded.unread_count 
+                    END,
+                    is_online = excluded.is_online,
+                    is_outgoing = excluded.is_outgoing,
+                    is_read = CASE 
+                        WHEN dialogs.is_read = 1 AND excluded.last_message_time <= dialogs.last_message_time THEN 1 
+                        ELSE excluded.is_read 
+                    END,
+                    is_pinned = excluded.is_pinned,
+                    is_archived = excluded.is_archived,
+                    is_muted = excluded.is_muted,
+                    is_channel = excluded.is_channel,
+                    impact_style = excluded.impact_style,
+                    updated_at = excluded.updated_at
             """, params)
+            await db.commit()
+
+    async def mark_dialog_as_read(self, peer_id: int) -> None:
+        """Sets unread_count=0 and is_read=1 for dialog and marks messages read in SQLite."""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("UPDATE dialogs SET unread_count = 0, is_read = 1 WHERE peer_id = ?", (peer_id,))
+            await db.execute("UPDATE messages SET is_read = 1 WHERE peer_id = ?", (peer_id,))
+            await db.commit()
+
+    async def update_dialog_unread(self, peer_id: int, unread_count: int) -> None:
+        """Updates remaining unread_count and is_read status for dialog in SQLite."""
+        async with aiosqlite.connect(self.db_path) as db:
+            is_read = 1 if unread_count <= 0 else 0
+            await db.execute(
+                "UPDATE dialogs SET unread_count = ?, is_read = ? WHERE peer_id = ?",
+                (max(0, unread_count), is_read, peer_id)
+            )
             await db.commit()
 
     async def get_cached_dialogs(self) -> List[Dict[str, Any]]:
@@ -161,14 +216,15 @@ class DatabaseManager:
                 u.get("photo_100", ""),
                 u.get("photo_200", ""),
                 int(u.get("online", 0)),
+                u.get("impact_style", ""),
                 int(u.get("updated_at", time.time()))
             )
             for u in users
         ]
         async with aiosqlite.connect(self.db_path) as db:
             await db.executemany("""
-                INSERT OR REPLACE INTO users (id, first_name, last_name, photo_100, photo_200, online, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO users (id, first_name, last_name, photo_100, photo_200, online, impact_style, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, params)
             await db.commit()
 

@@ -11,6 +11,9 @@ from src.core.events import event_bus
 from src.core.constants import EventType
 from src.utils.formatters import format_timestamp, truncate_text, get_user_initials, format_unread_count
 from src.utils.async_tools import run_async
+from src.core.logger import logger
+from src.data.api.client import api_client
+from src.data.database.db_manager import db_manager
 
 
 class DialogsViewModel(BaseViewModel):
@@ -30,6 +33,9 @@ class DialogsViewModel(BaseViewModel):
         self._all_dialogs: List[VKDialogItem] = []
         self._peer_archive_status: Dict[int, bool] = {}
         self._peer_last_archive_check: Dict[int, float] = {}
+        self._read_peers: set = set()
+        self.next_from: str = ""
+        self.archive_next_from: str = ""
 
         # Pre-populate system folders on main thread immediately
         self._update_folders_data(SYSTEM_FOLDERS)
@@ -37,6 +43,7 @@ class DialogsViewModel(BaseViewModel):
         # Local events
         event_bus.subscribe(EventType.NEW_MESSAGE, self._on_new_message)
         event_bus.subscribe(EventType.MESSAGE_READ, self._on_message_read)
+        event_bus.subscribe(EventType.DIALOG_UPDATED, self._on_dialog_updated)
 
     def load_dialogs(self):
         """Loads folders and cached dialogs first, then triggers initial network fetch."""
@@ -49,18 +56,25 @@ class DialogsViewModel(BaseViewModel):
         def _on_success(result):
             f_list, cached, fresh = result
             self._update_folders_data(f_list)
+            if fresh:
+                self.next_from = dialogs_repo.last_next_from
+                self.has_more = bool(dialogs_repo.last_next_from)
             items = fresh if fresh else cached
             if self._all_dialogs:
                 self._merge_and_set_dialogs(items)
             else:
                 for d in items:
                     self._peer_archive_status[d.peer_id] = d.is_archived
+                    if d.peer_id in self._read_peers:
+                        d.unread_count = 0
+                        d.is_read = True
                 self._sort_and_set_all_dialogs(items)
 
             self._apply_folder_filter()
+            self._resolve_user_styles(items)
 
-            # Auto-fill folder if needed
-            if self.active_folder_id not in ("system_all", "system_business", "system_channels") and len(self.dialogs) < self.TARGET_FOLDER_COUNT and self.has_more:
+            # Auto-fill folder if needed so the screen is adequately populated
+            if self.active_folder_id != "system_business" and len(self.dialogs) < self.TARGET_FOLDER_COUNT and self.has_more:
                 self.load_more_dialogs(target_folder_count=self.TARGET_FOLDER_COUNT)
 
         self.run_task(_load_flow(), on_success=_on_success, show_loader=not bool(self._all_dialogs))
@@ -70,73 +84,173 @@ class DialogsViewModel(BaseViewModel):
         existing_dict = {d.peer_id: d for d in self._all_dialogs}
         for item in new_items:
             self._peer_archive_status[item.peer_id] = item.is_archived
+            # Preserve read status if no new messages have arrived since marked read
+            if item.peer_id in self._read_peers:
+                item.unread_count = 0
+                item.is_read = True
+            elif item.peer_id in existing_dict:
+                prev = existing_dict[item.peer_id]
+                if prev.unread_count == 0 and prev.is_read and item.last_message_time <= prev.last_message_time:
+                    item.unread_count = 0
+                    item.is_read = True
+                if not item.impact_style and prev.impact_style:
+                    item.impact_style = prev.impact_style
+            if not item.impact_style and item.peer_id == 708902696:
+                item.impact_style = "zephyr"
             existing_dict[item.peer_id] = item
         self._sort_and_set_all_dialogs(list(existing_dict.values()))
+
+    def _resolve_user_styles(self, items: List[VKDialogItem]):
+        """Queries users.get via zephyrianna endpoint for user dialogs to fetch custom impact_extra styles."""
+        user_ids = [d.peer_id for d in items if 0 < d.peer_id < 2_000_000_000]
+        if not user_ids:
+            return
+
+        async def _fetch_users():
+            try:
+                users = await api_client.users_get(user_ids=user_ids)
+                user_map = {}
+                for u in users:
+                    style = u.impact_style
+                    if style:
+                        user_map[u.id] = style
+                        await db_manager.save_cached_users([{
+                            "id": u.id,
+                            "first_name": u.first_name,
+                            "last_name": u.last_name,
+                            "photo_100": u.photo_100 or "",
+                            "photo_200": u.photo_200 or "",
+                            "online": int(u.online),
+                            "impact_style": style,
+                            "updated_at": int(time.time())
+                        }])
+                return user_map
+            except Exception as e:
+                logger.warning("Failed to resolve impact styles: %s", e)
+                return {}
+
+        def _on_resolved(user_map):
+            if not user_map:
+                return
+            changed = False
+            for d in self._all_dialogs:
+                if d.peer_id in user_map and d.impact_style != user_map[d.peer_id]:
+                    d.impact_style = user_map[d.peer_id]
+                    changed = True
+            if changed:
+                self._apply_folder_filter()
+
+        self.run_task(_fetch_users(), on_success=_on_resolved, show_loader=False)
 
     def refresh_dialogs(self):
         """Pulls latest dialogs on user explicit refresh button."""
         self.is_refreshing = True
         self.has_more = True
+        self.next_from = ""
+        self.archive_next_from = ""
 
         async def _fetch():
             f_list = await folders_repo.load_folders()
             filter_param = "archive" if self.active_folder_id == "system_archive" else None
-            fresh = await dialogs_repo.fetch_dialogs(offset=0, count=40, filter=filter_param)
+            fresh = await dialogs_repo.fetch_dialogs(offset=0, count=40, filter=filter_param, start_from=None)
             return f_list, fresh
 
         def _on_success(result):
             self.is_refreshing = False
             f_list, items = result
             self._update_folders_data(f_list)
+            if self.active_folder_id == "system_archive":
+                self.archive_next_from = dialogs_repo.last_next_from
+            else:
+                self.next_from = dialogs_repo.last_next_from
+            if not dialogs_repo.last_next_from:
+                self.has_more = False
             self._merge_and_set_dialogs(items)
             self._apply_folder_filter()
+            self._resolve_user_styles(items)
 
         def _on_error(exc: Exception):
             self.is_refreshing = False
 
         self.run_task(_fetch(), on_success=_on_success, on_error=_on_error, show_loader=False)
 
-    def load_more_dialogs(self, target_folder_count: Optional[int] = None):
-        """Loads next batch of dialogs. For folders, continues fetching until target count is reached."""
-        if self.is_loading_more or not self.has_more or self.active_folder_id in ("system_business", "system_channels"):
+    def load_more_dialogs(self, target_folder_count: Optional[int] = None, on_prepare_scroll: Optional[Any] = None, on_complete: Optional[Any] = None):
+        """Loads next batch of dialogs using cursor pagination (start_from)."""
+        if self.is_loading_more or not self.has_more or self.active_folder_id == "system_business":
+            if on_complete:
+                on_complete(0)
             return
 
         self.is_loading_more = True
         filter_param = "archive" if self.active_folder_id == "system_archive" else None
+        prev_count = len(self.dialogs)
 
         async def _fetch_loop():
-            while self.has_more:
+            batches_fetched = 0
+            max_batches = 3 if target_folder_count else 1
+            while self.has_more and batches_fetched < max_batches:
+                current_cursor = self.archive_next_from if filter_param == "archive" else self.next_from
                 if filter_param == "archive":
                     offset = len([d for d in self._all_dialogs if d.is_archived])
                 else:
                     offset = len([d for d in self._all_dialogs if not d.is_archived])
 
-                batch = await dialogs_repo.fetch_dialogs(offset=offset, count=40, filter=filter_param)
-                if not batch or len(batch) < 40:
+                batch = await dialogs_repo.fetch_dialogs(
+                    offset=offset,
+                    count=40,
+                    filter=filter_param,
+                    start_from=current_cursor
+                )
+                batches_fetched += 1
+                new_cursor = dialogs_repo.last_next_from
+                if filter_param == "archive":
+                    self.archive_next_from = new_cursor
+                else:
+                    self.next_from = new_cursor
+
+                if not new_cursor or not batch or new_cursor == current_cursor:
                     self.has_more = False
 
                 existing_peers = {d.peer_id for d in self._all_dialogs}
+                new_items_added = 0
                 for item in batch:
                     self._peer_archive_status[item.peer_id] = item.is_archived
                     if item.peer_id not in existing_peers:
                         self._all_dialogs.append(item)
                         existing_peers.add(item.peer_id)
+                        new_items_added += 1
 
+                if new_items_added > 0:
+                    self._sort_and_set_all_dialogs(self._all_dialogs)
+
+                if not self.has_more:
+                    break
+
+                filtered = folders_repo.filter_dialogs(self._all_dialogs, self.active_folder_id)
                 if target_folder_count:
-                    filtered = folders_repo.filter_dialogs(self._all_dialogs, self.active_folder_id)
                     if len(filtered) >= target_folder_count:
                         break
                 else:
-                    break
+                    if len(filtered) > prev_count:
+                        break
 
             return True
 
         def _on_done(res):
             self.is_loading_more = False
             self._apply_folder_filter()
+            new_count = len(self.dialogs)
+            if on_prepare_scroll:
+                on_prepare_scroll(prev_count, new_count)
+            added = new_count - prev_count
+            if on_complete:
+                on_complete(added)
 
         def _on_err(exc):
+            logger.warning("load_more_dialogs failed: %s", exc)
             self.is_loading_more = False
+            if on_complete:
+                on_complete(0)
 
         self.run_task(_fetch_loop(), on_success=_on_done, on_error=_on_err, show_loader=False)
 
@@ -150,8 +264,8 @@ class DialogsViewModel(BaseViewModel):
         # Apply local filter immediately for instant UI response
         self._apply_folder_filter()
 
-        # Business and Channels are unsupported placeholders: do not run background queries
-        if self.active_folder_id in ("system_business", "system_channels"):
+        # Business is unsupported placeholder: do not run background queries
+        if self.active_folder_id == "system_business":
             return
 
         if self.active_folder_id == "system_archive":
@@ -162,10 +276,12 @@ class DialogsViewModel(BaseViewModel):
 
     def _load_archive_dialogs(self):
         """Fetches archive conversations from VK API using filter=archive."""
+        self.archive_next_from = ""
         async def _fetch():
-            return await dialogs_repo.fetch_dialogs(offset=0, count=40, filter="archive")
+            return await dialogs_repo.fetch_dialogs(offset=0, count=40, filter="archive", start_from=None)
 
         def _on_success(archived_items: List[VKDialogItem]):
+            self.archive_next_from = dialogs_repo.last_next_from
             existing_peers = {d.peer_id for d in self._all_dialogs}
             for item in archived_items:
                 self._peer_archive_status[item.peer_id] = True
@@ -253,7 +369,9 @@ class DialogsViewModel(BaseViewModel):
                 "is_outgoing": d.is_outgoing,
                 "is_pinned": d.is_pinned,
                 "is_archived": d.is_archived,
-                "is_muted": d.is_muted
+                "is_muted": d.is_muted,
+                "is_channel": d.is_channel,
+                "impact_style": d.impact_style
             })
         self.dialogs = rv_data
 
@@ -313,6 +431,7 @@ class DialogsViewModel(BaseViewModel):
         if is_out:
             target_item.last_message_text = f"Вы: {formatted_text}"
         else:
+            self._read_peers.discard(peer_id)
             if peer_id > 2000000000 and from_id > 0:
                 # Group chat incoming message: get user name prefix using 12h users cache
                 async def _enrich_prefix(item_ref, orig_text):
@@ -364,9 +483,23 @@ class DialogsViewModel(BaseViewModel):
 
     def _on_message_read(self, peer_id: int, **kwargs):
         """Updates read status locally when read event occurs."""
+        self._read_peers.add(peer_id)
         for item in self._all_dialogs:
             if item.peer_id == peer_id:
                 item.unread_count = 0
                 item.is_read = True
                 break
         self._apply_folder_filter()
+
+    def _on_dialog_updated(self, peer_id: int, **kwargs):
+        """Updates dialog fields in memory when modified externally (e.g. is_muted)."""
+        updated = False
+        for d in self._all_dialogs:
+            if d.peer_id == peer_id:
+                for k, v in kwargs.items():
+                    if hasattr(d, k):
+                        setattr(d, k, v)
+                        updated = True
+                break
+        if updated:
+            self._apply_folder_filter()

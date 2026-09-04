@@ -20,6 +20,8 @@ class DialogItemRow(ButtonBehavior, BoxLayout):
     is_outgoing = BooleanProperty(False)
     is_pinned = BooleanProperty(False)
     is_muted = BooleanProperty(False)
+    is_channel = BooleanProperty(False)
+    impact_style = StringProperty("")
 
 
     def on_release(self):
@@ -31,5 +33,8 @@ class DialogItemRow(ButtonBehavior, BoxLayout):
             parent_widget.open_chat(
                 peer_id=self.peer_id,
                 title=self.title,
-                avatar_url=self.avatar_url
+                avatar_url=self.avatar_url,
+                is_channel=self.is_channel,
+                is_muted=self.is_muted,
+                unread_count=self.unread_count
             )

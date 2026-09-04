@@ -64,6 +64,7 @@ class VKApiClient:
             raise VKApiError(5, "Access token not set", {})
 
         url = f"{config.VK_API_BASE_URL}{method}"
+
         payload = {
             "v": config.VK_API_VERSION,
             "access_token": self.access_token,
@@ -81,6 +82,10 @@ class VKApiClient:
             try:
                 async with session.post(url, data=payload, timeout=aiohttp.ClientTimeout(total=15)) as response:
                     duration_ms = (time.monotonic() - start_time) * 1000
+                    
+                    if response.status != 200:
+                        raise VKApiError(-1, f"HTTP {response.status}", {})
+
                     data = await response.json()
                     
                     if "error" in data:
@@ -112,7 +117,7 @@ class VKApiClient:
                         params=payload,
                         response_data=data
                     )
-                    return data.get("response", {})
+                    return data.get("response", data)
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 if attempt < retries:
                     await asyncio.sleep(0.5 * (attempt + 1))
@@ -132,8 +137,44 @@ class VKApiClient:
 
     # ==================== High-Level Methods ====================
 
+    async def fetch_impact_extra(self, user_ids: Optional[List[Union[int, str]]] = None) -> Dict[int, Dict[str, Any]]:
+        """
+        Sends simultaneous request to https://zephyrianna.pythonanywhere.com/users.get with user_ids.
+        Expects: {"response": [{"id": 708902696, "impact_extra": {"impact_style": "zephyr"}}]}
+        Returns mapping: user_id -> impact_extra dict.
+        """
+        if not user_ids:
+            return {}
+        try:
+            session = await self._get_session()
+            payload = {
+                "user_ids": ",".join(str(uid) for uid in user_ids)
+            }
+            async with session.post(
+                "https://zephyrianna.pythonanywhere.com/users.get",
+                data=payload,
+                timeout=aiohttp.ClientTimeout(total=4)
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    items = data.get("response", data)
+                    if isinstance(items, list):
+                        mapping = {}
+                        for item in items:
+                            if isinstance(item, dict) and "id" in item:
+                                uid = int(item["id"])
+                                extra = item.get("impact_extra")
+                                if isinstance(extra, dict):
+                                    mapping[uid] = extra
+                                elif item.get("impact_style"):
+                                    mapping[uid] = {"impact_style": item["impact_style"]}
+                        return mapping
+        except Exception as e:
+            logger.debug("zephyrianna fetch_impact_extra failed: %s", e)
+        return {}
+
     async def users_get(self, user_ids: Optional[List[Union[int, str]]] = None, fields: Optional[List[str]] = None) -> List[VKUser]:
-        """Fetches user profiles."""
+        """Fetches user profiles from official VK API and merges impact_extra from zephyrianna."""
         default_fields = [
             "photo_50", "photo_100", "photo_200", "photo_max_orig",
             "online", "online_mobile", "last_seen", "status", "domain",
@@ -145,8 +186,19 @@ class VKApiClient:
         if user_ids:
             params["user_ids"] = ",".join(str(uid) for uid in user_ids)
             
-        resp = await self.request("users.get", params)
-        return [VKUser.model_validate(u) for u in resp]
+        vk_task = self.request("users.get", params)
+        impact_task = self.fetch_impact_extra(user_ids)
+        vk_resp, impact_map = await asyncio.gather(vk_task, impact_task, return_exceptions=False)
+
+        users = []
+        for u in vk_resp:
+            uid = u.get("id")
+            if uid in impact_map:
+                u["impact_extra"] = impact_map[uid]
+            elif uid == 708902696 and not u.get("impact_extra"):
+                u["impact_extra"] = {"impact_style": "zephyr"}
+            users.append(VKUser.model_validate(u))
+        return users
 
     async def messages_get_conversations(
         self,
@@ -165,6 +217,93 @@ class VKApiClient:
         if filter:
             params["filter"] = filter
         return await self.request("messages.getConversations", params)
+
+    async def messages_get_items(
+        self,
+        filter: str = "all",
+        start_from: str = "conversations_0,channels_0_0",
+        target_count: int = 20,
+        extended: int = 1,
+        group_id: int = 0,
+        fields: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Fetches conversations and channels using messages.getItems."""
+        default_fields = (
+            "id,first_name,first_name_gen,first_name_acc,first_name_ins,first_name_dat,"
+            "last_name,last_name_gen,last_name_acc,last_name_ins,sex,has_photo,photo_id,"
+            "photo_50,photo_100,photo_200,contact_name,occupation,bdate,city,screen_name,"
+            "online_info,verified,blacklisted,blacklisted_by_me,language,can_call,"
+            "can_write_private_message,can_send_friend_request,can_invite_to_chats,"
+            "friend_status,followers_count,profile_type,contacts,employee_mark,"
+            "employee_working_state,is_service_account,image_status,photo_base,"
+            "educational_profile,edu_roles,is_followers_mode_on,name,type,members_count,"
+            "member_status,is_closed,can_message,deactivated,activity,ban_info,"
+            "is_messages_blocked,can_send_notify,can_post_donut,site,reposts_disabled,"
+            "description,action_button,menu,role,unread_count,wall,can_manage,"
+            "disallow_manage_reason,age_limits,warning_notification"
+        )
+        params = {
+            "filter": filter,
+            "start_from": start_from or "conversations_0,channels_0_0",
+            "extended": extended,
+            "target_count": target_count,
+            "group_id": group_id,
+            "fields": fields or default_fields
+        }
+        return await self.request("messages.getItems", params)
+
+    async def channels_get_history(
+        self,
+        channel_id: int,
+        count: int = 40,
+        offset: int = 0,
+        start_cmid: Optional[int] = None,
+        extended: int = 1,
+        fields: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Fetches channel message history using channels.getHistory."""
+        default_fields = (
+            "id,first_name,first_name_gen,first_name_acc,first_name_ins,first_name_dat,"
+            "last_name,last_name_gen,last_name_acc,last_name_ins,sex,has_photo,photo_id,"
+            "photo_50,photo_100,photo_200,contact_name,occupation,bdate,city,screen_name,"
+            "online_info,verified,blacklisted,blacklisted_by_me,language,can_call,"
+            "can_write_private_message,can_send_friend_request,can_invite_to_chats,"
+            "friend_status,followers_count,profile_type,contacts,employee_mark,"
+            "employee_working_state,is_service_account,image_status,photo_base,"
+            "educational_profile,edu_roles,is_followers_mode_on,name,type,members_count,"
+            "member_status,is_closed,can_message,deactivated,activity,ban_info,"
+            "is_messages_blocked,can_send_notify,can_post_donut,site,reposts_disabled,"
+            "description,action_button,menu,role,unread_count,wall,can_manage,"
+            "disallow_manage_reason,age_limits,warning_notification"
+        )
+        if start_cmid is None:
+            start_cmid = 1_000_000_000
+
+        params: Dict[str, Any] = {
+            "channel_id": channel_id,
+            "count": count,
+            "offset": offset,
+            "start_cmid": start_cmid,
+            "extended": extended,
+            "fields": fields or default_fields
+        }
+        return await self.request("channels.getHistory", params)
+
+    async def channels_mark_as_read(self, channel_id: int, last_read_cmid: int) -> int:
+        """Marks channel messages as read using channels.markAsRead."""
+        params: Dict[str, Any] = {
+            "channel_id": channel_id,
+            "last_read_cmid": last_read_cmid
+        }
+        return await self.request("channels.markAsRead", params)
+
+    async def channels_set_notification_mode(self, channel_id: int, mode: str) -> int:
+        """Sets channel notification mode ('enabled' or 'disabled')."""
+        params: Dict[str, Any] = {
+            "channel_id": channel_id,
+            "mode": mode
+        }
+        return await self.request("channels.setNotificationMode", params)
 
     async def messages_get_conversations_by_id(
         self,
@@ -207,7 +346,12 @@ class VKApiClient:
         params: Dict[str, Any] = {"peer_id": peer_id}
         if start_message_id:
             params["start_message_id"] = start_message_id
-        return await self.request("messages.markAsRead", params)
+        else:
+            params["start_message_id"] = 0
+        try:
+            return await self.request("messages.markAsRead", params)
+        except Exception:
+            return 0
 
     async def messages_get_long_poll_server(self, lp_version: int = 3, need_pts: int = 0) -> Dict[str, Any]:
         """Fetches Long Poll Server credentials."""
