@@ -1,0 +1,302 @@
+#:kivy 2.3.0
+#:import dp kivy.metrics.dp
+
+<DockbarStyleOptionItem>:
+    orientation: "horizontal"
+    size_hint_y: None
+    height: dp(56)
+    padding: [dp(12), dp(8)]
+    spacing: dp(14)
+    canvas.before:
+        Color:
+            rgba: (0.94, 0.95, 0.97, 0.6) if self.state == "down" else (0, 0, 0, 0)
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(12)]
+
+    MDIcon:
+        icon: root.icon_name
+        theme_icon_color: "Custom"
+        icon_color: app.accent_color if root.is_selected else app.secondary_text_color
+        size_hint: (None, None)
+        size: (dp(24), dp(24))
+        pos_hint: {"center_y": 0.5}
+
+    BoxLayout:
+        orientation: "vertical"
+        spacing: dp(1)
+        pos_hint: {"center_y": 0.5}
+
+        Label:
+            text: root.title_text
+            bold: True
+            font_size: "15sp"
+            color: app.text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+        Label:
+            text: root.desc_text
+            font_size: "11sp"
+            color: app.secondary_text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+    MDIcon:
+        icon: "radiobox-marked" if root.is_selected else "radiobox-blank"
+        theme_icon_color: "Custom"
+        icon_color: app.accent_color if root.is_selected else (0.5, 0.53, 0.58, 0.4)
+        size_hint: (None, None)
+        size: (dp(22), dp(22))
+        pos_hint: {"center_y": 0.5}
+
+
+<DockbarStyleDialog>:
+    size_hint: (0.88, None)
+    height: dp(360)
+    background_color: (0, 0, 0, 0.5)
+
+    BoxLayout:
+        orientation: "vertical"
+        size_hint: (1, 1)
+        padding: [dp(20), dp(18)]
+        spacing: dp(10)
+        canvas.before:
+            Color:
+                rgba: app.card_bg
+            RoundedRectangle:
+                pos: self.pos
+                size: self.size
+                radius: [dp(22)]
+
+        Label:
+            text: "Стиль докбара"
+            font_size: "18sp"
+            bold: True
+            color: app.text_color
+            size_hint_y: None
+            height: dp(26)
+            halign: "left"
+            text_size: (self.width, None)
+
+        BoxLayout:
+            orientation: "vertical"
+            size_hint_y: None
+            height: self.minimum_height
+            spacing: dp(4)
+
+            DockbarStyleOptionItem:
+                style_key: "impact"
+                title_text: "Impact"
+                desc_text: "Классическая панель во всю ширину"
+                icon_name: "dock-bottom"
+                is_selected: root.selected_style == "impact"
+                dialog: root
+
+            DockbarStyleOptionItem:
+                style_key: "telegram"
+                title_text: "Telegram"
+                desc_text: "Плавающая панель с подписями"
+                icon_name: "send-outline"
+                is_selected: root.selected_style == "telegram"
+                dialog: root
+
+            DockbarStyleOptionItem:
+                style_key: "pinterest"
+                title_text: "Pinterest"
+                desc_text: "Отдельные плавающие кнопки"
+                icon_name: "view-grid-outline"
+                is_selected: root.selected_style == "pinterest"
+                dialog: root
+
+            DockbarStyleOptionItem:
+                style_key: "incy"
+                title_text: "Incy"
+                desc_text: "Плавающая капсула с обводкой"
+                icon_name: "pill"
+                is_selected: root.selected_style == "incy"
+                dialog: root
+
+
+<DockbarSelectionOptionItem>:
+    orientation: "horizontal"
+    size_hint_y: None
+    height: dp(56)
+    padding: [dp(12), dp(8)]
+    spacing: dp(14)
+    canvas.before:
+        Color:
+            rgba: (0.94, 0.95, 0.97, 0.6) if self.state == "down" else (0, 0, 0, 0)
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(12)]
+
+    MDIcon:
+        icon: root.icon_name
+        theme_icon_color: "Custom"
+        icon_color: app.accent_color if root.is_selected else app.secondary_text_color
+        size_hint: (None, None)
+        size: (dp(24), dp(24))
+        pos_hint: {"center_y": 0.5}
+
+    BoxLayout:
+        orientation: "vertical"
+        spacing: dp(1)
+        pos_hint: {"center_y": 0.5}
+
+        Label:
+            text: root.title_text
+            bold: True
+            font_size: "15sp"
+            color: app.text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+        Label:
+            text: root.desc_text
+            font_size: "11sp"
+            color: app.secondary_text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+    MDIcon:
+        icon: "radiobox-marked" if root.is_selected else "radiobox-blank"
+        theme_icon_color: "Custom"
+        icon_color: app.accent_color if root.is_selected else (0.5, 0.53, 0.58, 0.4)
+        size_hint: (None, None)
+        size: (dp(22), dp(22))
+        pos_hint: {"center_y": 0.5}
+
+
+<DockbarSelectionDialog>:
+    options_container: options_container
+    size_hint: (0.88, None)
+    height: dp(230) if root.dockbar_style == "pinterest" else dp(285)
+    background_color: (0, 0, 0, 0.5)
+
+    BoxLayout:
+        orientation: "vertical"
+        size_hint: (1, 1)
+        padding: [dp(20), dp(18)]
+        spacing: dp(10)
+        canvas.before:
+            Color:
+                rgba: app.card_bg
+            RoundedRectangle:
+                pos: self.pos
+                size: self.size
+                radius: [dp(22)]
+
+        Label:
+            text: root.dialog_title
+            font_size: "18sp"
+            bold: True
+            color: app.text_color
+            size_hint_y: None
+            height: dp(26)
+            halign: "left"
+            text_size: (self.width, None)
+
+        BoxLayout:
+            id: options_container
+            orientation: "vertical"
+            size_hint_y: None
+            height: self.minimum_height
+            spacing: dp(4)
+
+
+<DockbarBgOptionItem>:
+    orientation: "horizontal"
+    size_hint_y: None
+    height: dp(56)
+    padding: [dp(12), dp(8)]
+    spacing: dp(14)
+    canvas.before:
+        Color:
+            rgba: (0.94, 0.95, 0.97, 0.6) if self.state == "down" else (0, 0, 0, 0)
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(12)]
+
+    MDIcon:
+        icon: root.icon_name
+        theme_icon_color: "Custom"
+        icon_color: app.accent_color if root.is_selected else app.secondary_text_color
+        size_hint: (None, None)
+        size: (dp(24), dp(24))
+        pos_hint: {"center_y": 0.5}
+
+    BoxLayout:
+        orientation: "vertical"
+        spacing: dp(1)
+        pos_hint: {"center_y": 0.5}
+
+        Label:
+            text: root.title_text
+            bold: True
+            font_size: "15sp"
+            color: app.text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+        Label:
+            text: root.desc_text
+            font_size: "11sp"
+            color: app.secondary_text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+    MDIcon:
+        icon: "radiobox-marked" if root.is_selected else "radiobox-blank"
+        theme_icon_color: "Custom"
+        icon_color: app.accent_color if root.is_selected else (0.5, 0.53, 0.58, 0.4)
+        size_hint: (None, None)
+        size: (dp(22), dp(22))
+        pos_hint: {"center_y": 0.5}
+
+
+<DockbarBgDialog>:
+    options_container: options_container
+    size_hint: (0.88, None)
+    height: dp(285)
+    background_color: (0, 0, 0, 0.5)
+
+    BoxLayout:
+        orientation: "vertical"
+        size_hint: (1, 1)
+        padding: [dp(20), dp(18)]
+        spacing: dp(10)
+        canvas.before:
+            Color:
+                rgba: app.card_bg
+            RoundedRectangle:
+                pos: self.pos
+                size: self.size
+                radius: [dp(22)]
+
+        Label:
+            text: "Фон докбара"
+            font_size: "18sp"
+            bold: True
+            color: app.text_color
+            size_hint_y: None
+            height: dp(26)
+            halign: "left"
+            text_size: (self.width, None)
+
+        BoxLayout:
+            id: options_container
+            orientation: "vertical"
+            size_hint_y: None
+            height: self.minimum_height
+            spacing: dp(4)
+

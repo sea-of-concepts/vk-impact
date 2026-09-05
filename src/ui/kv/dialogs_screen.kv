@@ -9,7 +9,7 @@
     spacing: dp(14)
     canvas.before:
         Color:
-            rgba: (0.94, 0.95, 0.97, 1) if self.state == "down" else (0, 0, 0, 0)
+            rgba: app.divider_color if self.state == "down" else (0, 0, 0, 0)
         Rectangle:
             pos: self.pos
             size: self.size
@@ -36,7 +36,7 @@
 
             Label:
                 text: root.title
-                color: (0.1, 0.1, 0.1, 1)
+                color: app.text_color
                 bold: True
                 font_size: "16sp"
                 halign: "left"
@@ -52,12 +52,12 @@
                 size: (dp(16), dp(16)) if root.is_pinned else (0, 0)
                 opacity: 1 if root.is_pinned else 0
                 theme_icon_color: "Custom"
-                icon_color: (0.45, 0.48, 0.54, 1)
+                icon_color: app.secondary_text_color
                 pos_hint: {"center_y": 0.5}
 
             Label:
                 text: root.time_text
-                color: (0.55, 0.55, 0.55, 1)
+                color: app.secondary_text_color
                 font_size: "12sp"
                 size_hint_x: None
                 width: dp(56)
@@ -71,7 +71,7 @@
 
             Label:
                 text: root.last_message
-                color: (0.45, 0.45, 0.45, 1)
+                color: app.secondary_text_color
                 font_size: "14sp"
                 halign: "left"
                 valign: "middle"
@@ -93,7 +93,7 @@
                 valign: "middle"
                 canvas.before:
                     Color:
-                        rgba: ((0.55, 0.58, 0.64, 1) if root.is_muted else (0.24, 0.48, 0.95, 1)) if root.unread_count > 0 else (0, 0, 0, 0)
+                        rgba: ((0.55, 0.58, 0.64, 1) if root.is_muted else app.accent_color) if root.unread_count > 0 else (0, 0, 0, 0)
                     RoundedRectangle:
                         pos: self.pos
                         size: (self.width, self.height) if root.unread_count > 0 else (0, 0)
@@ -101,121 +101,132 @@
 
 
 <DialogsScreen>:
-    md_bg_color: self.theme_cls.backgroundColor
+    md_bg_color: app.bg_color
 
-    BoxLayout:
-        orientation: "vertical"
-
-        # Top App Bar
-        MDTopAppBar:
-            type: "small"
-
-            MDTopAppBarTitle:
-                text: "Сообщения"
-
-            MDTopAppBarTrailingButtonContainer:
-                MDIconButton:
-                    icon: "refresh"
-                    on_release: root.vm.refresh_dialogs()
-
-        # Horizontal ScrollView for Folders (Чаты, ЛС, Каналы, Архив, Бизнес, Группы, +)
-        ScrollView:
-            do_scroll_y: False
-            do_scroll_x: True
-            size_hint_y: None
-            height: dp(42)
-            bar_width: 0
-
-            BoxLayout:
-                id: folder_container
-                orientation: "horizontal"
-                size_hint_x: None
-                width: self.minimum_width
-                padding: [dp(12), dp(4)]
-                spacing: dp(8)
-
-        # Conversations RecycleView (hidden when in unsupported folders)
-        RecycleView:
-            id: rv_dialogs
-            viewclass: "DialogItemRow"
-            data: root.vm.dialogs
-            scroll_type: ['bars', 'content']
-            bar_width: dp(4)
-            size_hint_y: 1 if root.vm.active_folder_id != 'system_business' else None
-            height: 0 if root.vm.active_folder_id == 'system_business' else self.parent.height
-            opacity: 1 if root.vm.active_folder_id != 'system_business' else 0
-            disabled: root.vm.active_folder_id == 'system_business'
-            on_scroll_y: root.on_rv_scroll(self.scroll_y)
-
-            RecycleBoxLayout:
-                default_size: None, dp(76)
-                default_size_hint: 1, None
-                size_hint_y: None
-                height: self.minimum_height
-                orientation: "vertical"
-
-        # Placeholder for unsupported folder (Бизнес)
+    FloatLayout:
         BoxLayout:
             orientation: "vertical"
-            size_hint_y: 1 if root.vm.active_folder_id == 'system_business' else None
-            height: 0 if root.vm.active_folder_id != 'system_business' else self.parent.height
-            opacity: 1 if root.vm.active_folder_id == 'system_business' else 0
-            disabled: root.vm.active_folder_id != 'system_business'
-            padding: [dp(24), dp(32)]
-            spacing: dp(12)
+            pos_hint: {"x": 0, "y": 0}
+            size_hint: (1, 1)
 
-            Widget:
-                size_hint_y: 1
+            # Top App Bar
+            MDTopAppBar:
+                type: "small"
+                theme_bg_color: "Custom"
+                md_bg_color: app.surface_color
 
-            MDIcon:
-                icon: "alert-circle-outline"
-                theme_icon_color: "Custom"
-                icon_color: (0.55, 0.58, 0.64, 1)
-                size_hint: (None, None)
-                size: (dp(56), dp(56))
-                pos_hint: {"center_x": 0.5}
+                MDTopAppBarTitle:
+                    text: "Сообщения"
+                    theme_text_color: "Custom"
+                    text_color: app.text_color
 
-            Label:
-                text: "Раздел не поддерживается"
-                bold: True
-                font_size: "18sp"
-                color: (0.15, 0.18, 0.22, 1)
-                halign: "center"
+                MDTopAppBarTrailingButtonContainer:
+                    MDIconButton:
+                        icon: "refresh"
+                        theme_icon_color: "Custom"
+                        icon_color: app.text_color
+                        on_release: root.vm.refresh_dialogs()
+
+            # Horizontal ScrollView for Folders (Чаты, ЛС, Каналы, Архив, Бизнес, Группы, +)
+            ScrollView:
+                do_scroll_y: False
+                do_scroll_x: True
                 size_hint_y: None
-                height: dp(26)
+                height: dp(42)
+                bar_width: 0
 
-            Label:
-                text: "Папка «Бизнес» пока не поддерживается"
-                font_size: "14sp"
-                color: (0.5, 0.53, 0.58, 1)
-                halign: "center"
+                BoxLayout:
+                    id: folder_container
+                    orientation: "horizontal"
+                    size_hint_x: None
+                    width: self.minimum_width
+                    padding: [dp(12), dp(4)]
+                    spacing: dp(8)
+
+            # Conversations RecycleView (hidden when in unsupported folders)
+            RecycleView:
+                id: rv_dialogs
+                viewclass: "DialogItemRow"
+                data: root.vm.dialogs
+                scroll_type: ['bars', 'content']
+                bar_width: dp(4)
+                size_hint_y: 1 if root.vm.active_folder_id != 'system_business' else None
+                height: 0 if root.vm.active_folder_id == 'system_business' else self.parent.height
+                opacity: 1 if root.vm.active_folder_id != 'system_business' else 0
+                disabled: root.vm.active_folder_id == 'system_business'
+                on_scroll_y: root.on_rv_scroll(self.scroll_y)
+
+                RecycleBoxLayout:
+                    default_size: None, dp(76)
+                    default_size_hint: 1, None
+                    size_hint_y: None
+                    height: self.minimum_height
+                    orientation: "vertical"
+                    padding: [0, 0, 0, dp(88)]
+
+            # Placeholder for unsupported folder (Бизнес)
+            BoxLayout:
+                orientation: "vertical"
+                size_hint_y: 1 if root.vm.active_folder_id == 'system_business' else None
+                height: 0 if root.vm.active_folder_id != 'system_business' else self.parent.height
+                opacity: 1 if root.vm.active_folder_id == 'system_business' else 0
+                disabled: root.vm.active_folder_id != 'system_business'
+                padding: [dp(24), dp(32)]
+                spacing: dp(12)
+
+                Widget:
+                    size_hint_y: 1
+
+                MDIcon:
+                    icon: "alert-circle-outline"
+                    theme_icon_color: "Custom"
+                    icon_color: app.secondary_text_color
+                    size_hint: (None, None)
+                    size: (dp(56), dp(56))
+                    pos_hint: {"center_x": 0.5}
+
+                Label:
+                    text: "Раздел не поддерживается"
+                    bold: True
+                    font_size: "18sp"
+                    color: app.text_color
+                    halign: "center"
+                    size_hint_y: None
+                    height: dp(26)
+
+                Label:
+                    text: "Папка «Бизнес» пока не поддерживается"
+                    font_size: "14sp"
+                    color: app.secondary_text_color
+                    halign: "center"
+                    size_hint_y: None
+                    height: dp(22)
+
+                Widget:
+                    size_hint_y: 1.5
+
+            # Bottom loading more indicator
+            BoxLayout:
                 size_hint_y: None
-                height: dp(22)
+                height: dp(36) if root.vm.is_loading_more else 0
+                opacity: 1 if root.vm.is_loading_more else 0
+                MDCircularProgressIndicator:
+                    size_hint: (None, None)
+                    size: (dp(22), dp(22))
+                    pos_hint: {"center_x": 0.5, "center_y": 0.5}
 
-            Widget:
-                size_hint_y: 1.5
-
-        # Bottom loading more indicator
-        BoxLayout:
-            size_hint_y: None
-            height: dp(36) if root.vm.is_loading_more else 0
-            opacity: 1 if root.vm.is_loading_more else 0
-            MDCircularProgressIndicator:
-                size_hint: (None, None)
-                size: (dp(22), dp(22))
-                pos_hint: {"center_x": 0.5, "center_y": 0.5}
-
-        # Loading indicator for empty initial state
-        BoxLayout:
-            size_hint_y: None
-            height: dp(48) if root.vm.is_loading else 0
-            opacity: 1 if root.vm.is_loading else 0
-            MDCircularProgressIndicator:
-                size_hint: (None, None)
-                size: (dp(32), dp(32))
-                pos_hint: {"center_x": 0.5, "center_y": 0.5}
+            # Loading indicator for empty initial state
+            BoxLayout:
+                size_hint_y: None
+                height: dp(48) if root.vm.is_loading else 0
+                opacity: 1 if root.vm.is_loading else 0
+                MDCircularProgressIndicator:
+                    size_hint: (None, None)
+                    size: (dp(32), dp(32))
+                    pos_hint: {"center_x": 0.5, "center_y": 0.5}
 
         # Bottom DockBar (Сообщения | >/. | Настройки)
         DockBar:
             id: dockbar
             active_tab: "dialogs"
+            pos_hint: {"center_x": 0.5, "y": 0}

@@ -1,0 +1,206 @@
+#:kivy 2.3.0
+#:import dp kivy.metrics.dp
+
+<AddProfileDialog>:
+    background_color: (0, 0, 0, 0.5)
+    size_hint: (0.92, None)
+    height: dp(440)
+    pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+    MDCard:
+        orientation: "vertical"
+        padding: [dp(20), dp(18)]
+        spacing: dp(14)
+        style: "elevated"
+        radius: [dp(20)]
+        theme_bg_color: "Custom"
+        md_bg_color: app.card_bg
+
+        # Header Title
+        MDLabel:
+            text: "Добавить профиль"
+            font_style: "Title"
+            role: "medium"
+            bold: True
+            theme_text_color: "Custom"
+            text_color: app.text_color
+            size_hint_y: None
+            height: dp(28)
+
+        # 3 Selector Buttons (Tabs)
+        BoxLayout:
+            orientation: "horizontal"
+            size_hint_y: None
+            height: dp(38)
+            spacing: dp(6)
+
+            MDButton:
+                style: "filled" if root.active_mode == "create" else "tonal"
+                size_hint_x: 0.36
+                on_release: root.switch_mode("create")
+                MDButtonText:
+                    text: "Создать"
+                    pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+            MDButton:
+                style: "filled" if root.active_mode == "json" else "tonal"
+                size_hint_x: 0.36
+                on_release: root.switch_mode("json")
+                MDButtonText:
+                    text: "Текст JSON"
+                    pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+            MDButton:
+                style: "filled" if root.active_mode == "file" else "tonal"
+                size_hint_x: 0.28
+                on_release: root.switch_mode("file")
+                MDButtonText:
+                    text: "Файл"
+                    pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+        # Dynamic Content Container based on active_mode
+        BoxLayout:
+            orientation: "vertical"
+            size_hint_y: 1
+            spacing: dp(8)
+
+            # Mode 1: Create new profile (single line text field)
+            BoxLayout:
+                orientation: "vertical"
+                size_hint_y: 1 if root.active_mode == "create" else None
+                height: dp(90) if root.active_mode == "create" else 0
+                opacity: 1 if root.active_mode == "create" else 0
+                disabled: root.active_mode != "create"
+                spacing: dp(6)
+
+                MDLabel:
+                    text: "Введите название нового профиля:"
+                    font_style: "Body"
+                    role: "small"
+                    theme_text_color: "Custom"
+                    text_color: app.secondary_text_color
+                    size_hint_y: None
+                    height: dp(24)
+
+                MDTextField:
+                    mode: "outlined"
+                    size_hint_x: 1
+                    text: root.profile_name_input
+                    on_text: root.profile_name_input = self.text
+                    MDTextFieldHintText:
+                        text: "Название профиля"
+
+            # Mode 2: Paste JSON text (multiline text field)
+            BoxLayout:
+                orientation: "vertical"
+                size_hint_y: 1 if root.active_mode == "json" else None
+                height: dp(160) if root.active_mode == "json" else 0
+                opacity: 1 if root.active_mode == "json" else 0
+                disabled: root.active_mode != "json"
+                spacing: dp(6)
+
+                MDLabel:
+                    text: "Вставьте JSON с конфигурацией профиля:"
+                    font_style: "Body"
+                    role: "small"
+                    theme_text_color: "Custom"
+                    text_color: app.secondary_text_color
+                    size_hint_y: None
+                    height: dp(24)
+
+                MDTextField:
+                    mode: "outlined"
+                    multiline: True
+                    size_hint_x: 1
+                    size_hint_y: 1
+                    text: root.json_text_input
+                    on_text: root.json_text_input = self.text
+                    MDTextFieldHintText:
+                        text: '{"name": "Мой профиль", ...}'
+
+            # Mode 3: Import file (Drop zone & browse button)
+            BoxLayout:
+                orientation: "vertical"
+                size_hint_y: 1 if root.active_mode == "file" else None
+                height: dp(160) if root.active_mode == "file" else 0
+                opacity: 1 if root.active_mode == "file" else 0
+                disabled: root.active_mode != "file"
+                spacing: dp(8)
+
+                DropZoneCard:
+                    id: drop_card
+                    size_hint_y: 1
+
+                    canvas.before:
+                        Color:
+                            rgba: app.input_bg
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [dp(14)]
+                        Color:
+                            rgba: app.accent_color
+                        Line:
+                            rounded_rectangle: [self.x, self.y, self.width, self.height, dp(14)]
+                            width: dp(1.5)
+                    on_release: root.browse_file()
+
+                    BoxLayout:
+                        orientation: "vertical"
+                        padding: [dp(12), dp(16)]
+                        spacing: dp(8)
+                        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+                        MDIcon:
+                            icon: "file-upload-outline" if not root.file_name_display else "file-check-outline"
+                            theme_icon_color: "Custom"
+                            icon_color: app.accent_color if not root.file_name_display else (0.2, 0.75, 0.3, 1)
+                            size_hint: (None, None)
+                            size: (dp(36), dp(36))
+                            pos_hint: {"center_x": 0.5}
+
+                        Label:
+                            text: ("Файл: " + root.file_name_display) if root.file_name_display else "Перетащите JSON файл сюда\nили нажмите для выбора"
+                            font_size: "14sp"
+                            bold: bool(root.file_name_display)
+                            color: app.text_color
+                            halign: "center"
+                            valign: "middle"
+                            text_size: (self.width, None)
+
+        # Error Message Banner
+        MDLabel:
+            text: root.error_message
+            theme_text_color: "Custom"
+            text_color: (0.9, 0.2, 0.2, 1)
+            font_style: "Body"
+            role: "small"
+            size_hint_y: None
+            height: dp(22) if root.error_message else 0
+            opacity: 1 if root.error_message else 0
+            halign: "center"
+
+        # Action Buttons (Cancel / OK)
+        BoxLayout:
+            orientation: "horizontal"
+            size_hint_y: None
+            height: dp(42)
+            spacing: dp(10)
+
+            MDButton:
+                style: "tonal"
+                size_hint_x: 0.5
+                on_release: root.dismiss()
+                MDButtonText:
+                    text: "Отмена"
+                    pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+            MDButton:
+                style: "filled"
+                size_hint_x: 0.5
+                theme_bg_color: "Custom"
+                md_bg_color: app.accent_color
+                on_release: root.submit()
+                MDButtonText:
+                    text: "ОК"
+                    pos_hint: {"center_x": 0.5, "center_y": 0.5}

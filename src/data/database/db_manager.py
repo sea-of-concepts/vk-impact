@@ -14,6 +14,22 @@ class DatabaseManager:
         self.db_path = db_path
         os.makedirs(os.path.dirname(self.db_path) if os.path.dirname(self.db_path) else ".", exist_ok=True)
 
+    def set_user(self, user_id: int) -> None:
+        """Switches the active database to the account-specific SQLite database."""
+        from src.core.config import config
+        target_path = str(config.DATA_DIR / f"vk_impact_{user_id}.db")
+        legacy_path = str(config.DB_PATH)
+        if not os.path.exists(target_path) and os.path.exists(legacy_path):
+            try:
+                import shutil
+                shutil.copy2(legacy_path, target_path)
+                logger.info("Migrated legacy database %s -> %s", legacy_path, target_path)
+            except Exception as e:
+                logger.warning("Could not copy legacy database: %s", e)
+        self.db_path = target_path
+        os.makedirs(os.path.dirname(self.db_path) if os.path.dirname(self.db_path) else ".", exist_ok=True)
+
+
     async def init_db(self) -> None:
         """Initializes database tables with WAL mode and memory pragmas."""
         async with aiosqlite.connect(self.db_path) as db:
@@ -187,6 +203,14 @@ class DatabaseManager:
                 (max(0, unread_count), is_read, peer_id)
             )
             await db.commit()
+
+    async def get_dialog_by_peer(self, peer_id: int) -> Optional[Dict[str, Any]]:
+        """Retrieves a single dialog record by peer_id from local database."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute("SELECT * FROM dialogs WHERE peer_id = ?", (peer_id,))
+            row = await cursor.fetchone()
+            return dict(row) if row else None
 
     async def get_cached_dialogs(self) -> List[Dict[str, Any]]:
         """Retrieves cached dialogs ordered with pinned chats first, then by date descending."""

@@ -68,5 +68,10 @@ class AppConfig:
     def SESSION_FILE(self) -> Path:
         return self.DATA_DIR / "session.enc"
 
+    @property
+    def ACCOUNTS_FILE(self) -> Path:
+        return self.DATA_DIR / "accounts.enc"
+
 
 config = AppConfig()
+

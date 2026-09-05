@@ -1,0 +1,196 @@
+#:kivy 2.3.0
+#:import dp kivy.metrics.dp
+
+<CustomProfileCardItem>:
+    profile_id: ""
+    profile_name: ""
+    is_active: False
+    screen: None
+
+    orientation: "horizontal"
+    size_hint_y: None
+    height: dp(64)
+    padding: [dp(16), dp(10)]
+    spacing: dp(10)
+    canvas.before:
+        Color:
+            rgba: app.card_bg
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(16)]
+        Color:
+            rgba: [app.accent_color[0], app.accent_color[1], app.accent_color[2], 0.7] if self.is_active else (0, 0, 0, 0)
+        Line:
+            rounded_rectangle: [self.x, self.y, self.width, self.height, dp(16)]
+            width: dp(1.8)
+
+    on_release: self.screen.on_profile_select(self.profile_id) if self.screen else None
+
+    # Icon
+    MDIcon:
+        icon: "palette-outline"
+        theme_icon_color: "Custom"
+        icon_color: app.accent_color
+        size_hint: (None, None)
+        size: (dp(26), dp(26))
+        pos_hint: {"center_y": 0.5}
+
+    # Profile Name
+    Label:
+        text: root.profile_name
+        bold: True
+        font_size: "15sp"
+        color: app.text_color
+        halign: "left"
+        valign: "middle"
+        text_size: (self.width, None)
+        shorten: True
+        shorten_from: "right"
+        pos_hint: {"center_y": 0.5}
+
+    # Active indicator
+    MDIcon:
+        icon: "check-circle"
+        theme_icon_color: "Custom"
+        icon_color: app.accent_color
+        size_hint: (None, None)
+        size: (dp(22), dp(22))
+        pos_hint: {"center_y": 0.5}
+        opacity: 1 if root.is_active else 0
+
+    # 1. Edit (Pencil) Button
+    MDIconButton:
+        icon: "pencil-outline"
+        theme_icon_color: "Custom"
+        icon_color: app.secondary_text_color
+        size_hint: (None, None)
+        size: (dp(36), dp(36))
+        pos_hint: {"center_y": 0.5}
+        on_release: root.screen.on_edit_profile(root.profile_id) if root.screen else None
+
+    # 2. Delete (Trash Can) Button
+    MDIconButton:
+        icon: "trash-can-outline"
+        theme_icon_color: "Custom"
+        icon_color: (0.85, 0.25, 0.25, 1)
+        size_hint: (None, None)
+        size: (dp(36), dp(36))
+        pos_hint: {"center_y": 0.5}
+        on_release: root.screen.on_delete_profile(root.profile_id) if root.screen else None
+
+
+<PersonalizationSettingsScreen>:
+    md_bg_color: app.bg_color
+
+    BoxLayout:
+        orientation: "vertical"
+
+        # Top App Bar with back button and '+' action on top right
+        MDTopAppBar:
+            type: "small"
+            theme_bg_color: "Custom"
+            md_bg_color: app.surface_color
+
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "arrow-left"
+                    theme_icon_color: "Custom"
+                    icon_color: app.text_color
+                    on_release: root.on_back_pressed()
+
+            MDTopAppBarTitle:
+                text: "Персонализация"
+                theme_text_color: "Custom"
+                text_color: app.text_color
+
+            MDTopAppBarTrailingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "plus"
+                    theme_icon_color: "Custom"
+                    icon_color: app.accent_color
+                    on_release: root.on_add_profile_pressed()
+
+        # Content List
+        ScrollView:
+            do_scroll_x: False
+            do_scroll_y: True
+
+            BoxLayout:
+                orientation: "vertical"
+                size_hint_y: None
+                height: self.minimum_height
+                padding: [dp(16), dp(16)]
+                spacing: dp(12)
+
+                # Системный профиль (всегда первый, без кнопок редактирования и удаления)
+                SystemProfileCardItem:
+                    size_hint_y: None
+                    height: dp(68)
+                    on_release: root.on_system_profile_clicked()
+
+                    canvas.before:
+                        Color:
+                            rgba: app.card_bg
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [dp(16)]
+                        Color:
+                            rgba: [app.accent_color[0], app.accent_color[1], app.accent_color[2], 0.7] if root.system_is_active else (0, 0, 0, 0)
+                        Line:
+                            rounded_rectangle: [self.x, self.y, self.width, self.height, dp(16)]
+                            width: dp(1.8)
+
+                    BoxLayout:
+                        orientation: "horizontal"
+                        padding: [dp(16), dp(14)]
+                        spacing: dp(14)
+                        size_hint: (1, 1)
+
+                        MDIcon:
+                            icon: "palette-outline"
+                            theme_icon_color: "Custom"
+                            icon_color: app.accent_color
+                            size_hint: (None, None)
+                            size: (dp(26), dp(26))
+                            pos_hint: {"center_y": 0.5}
+
+                        BoxLayout:
+                            orientation: "vertical"
+                            spacing: dp(2)
+                            pos_hint: {"center_y": 0.5}
+
+                            Label:
+                                text: "системный профиль"
+                                bold: True
+                                font_size: "15sp"
+                                color: app.text_color
+                                halign: "left"
+                                valign: "middle"
+                                text_size: (self.width, None)
+
+                            Label:
+                                text: "Стандартная тема оформления приложения"
+                                font_size: "12sp"
+                                color: app.secondary_text_color
+                                halign: "left"
+                                valign: "middle"
+                                text_size: (self.width, None)
+
+                        MDIcon:
+                            icon: "check-circle"
+                            theme_icon_color: "Custom"
+                            icon_color: app.accent_color
+                            size_hint: (None, None)
+                            size: (dp(22), dp(22))
+                            pos_hint: {"center_y": 0.5}
+                            opacity: 1 if root.system_is_active else 0
+
+                # Контейнер кастомных профилей (под системным)
+                BoxLayout:
+                    id: custom_profiles_container
+                    orientation: "vertical"
+                    size_hint_y: None
+                    height: self.minimum_height
+                    spacing: dp(10)

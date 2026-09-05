@@ -1,0 +1,134 @@
+#:kivy 2.3.0
+#:import dp kivy.metrics.dp
+
+<AccountCardItem>:
+    user_id: 0
+    user_name: ""
+    avatar_url: ""
+    impact_style: ""
+    method: ""
+    is_active: False
+    screen: None
+
+    orientation: "horizontal"
+    size_hint_y: None
+    height: dp(72)
+    padding: [dp(14), dp(10)]
+    spacing: dp(14)
+    canvas.before:
+        Color:
+            rgba: app.card_bg
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(16)]
+        Color:
+            rgba: [app.accent_color[0], app.accent_color[1], app.accent_color[2], 0.7] if self.is_active else (0, 0, 0, 0)
+        Line:
+            rounded_rectangle: [self.x, self.y, self.width, self.height, dp(16)]
+            width: dp(1.8)
+
+    on_release: self.screen.on_account_clicked(self.user_id) if self.screen else None
+
+    CircularAvatar:
+        source: root.avatar_url
+        impact_style: root.impact_style
+        peer_id: root.user_id
+        size_dp: 48
+        pos_hint: {"center_y": 0.5}
+
+    BoxLayout:
+        orientation: "vertical"
+        spacing: dp(3)
+        pos_hint: {"center_y": 0.5}
+
+        Label:
+            text: root.user_name
+            bold: True
+            font_size: "15sp"
+            color: app.text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+            shorten: True
+            shorten_from: "right"
+
+        Label:
+            text: "ID: " + str(root.user_id) + " • " + root.method
+            font_size: "13sp"
+            color: app.secondary_text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+    # Active Indicator / Badge
+    BoxLayout:
+        orientation: "horizontal"
+        size_hint_x: None
+        width: dp(36)
+        pos_hint: {"center_y": 0.5}
+
+        MDIcon:
+            icon: "check-circle" if root.is_active else "chevron-right"
+            theme_icon_color: "Custom"
+            icon_color: app.accent_color if root.is_active else app.secondary_text_color
+            size_hint: (None, None)
+            size: (dp(24), dp(24))
+            pos_hint: {"center_y": 0.5, "center_x": 0.5}
+
+
+<AccountSelectionScreen>:
+    md_bg_color: app.bg_color
+
+    BoxLayout:
+        orientation: "vertical"
+
+        # Top App Bar
+        MDTopAppBar:
+            type: "small"
+            theme_bg_color: "Custom"
+            md_bg_color: app.surface_color
+
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "arrow-left"
+                    theme_icon_color: "Custom"
+                    icon_color: app.text_color
+                    on_release: root.on_back_pressed()
+
+            MDTopAppBarTitle:
+                text: "Выбор аккаунта"
+                theme_text_color: "Custom"
+                text_color: app.text_color
+
+        # Accounts List
+        ScrollView:
+            do_scroll_x: False
+            do_scroll_y: True
+
+            BoxLayout:
+                orientation: "vertical"
+                size_hint_y: None
+                height: self.minimum_height
+                padding: [dp(16), dp(16)]
+                spacing: dp(14)
+
+                BoxLayout:
+                    id: accounts_container
+                    orientation: "vertical"
+                    size_hint_y: None
+                    height: self.minimum_height
+                    spacing: dp(10)
+
+                # Add new account button
+                MDButton:
+                    style: "tonal"
+                    size_hint_x: 1
+                    size_hint_y: None
+                    height: dp(48)
+                    on_release: root.on_add_account_pressed()
+                    MDButtonIcon:
+                        icon: "account-plus-outline"
+                    MDButtonText:
+                        text: "Добавить новый аккаунт"
+                        pos_hint: {"center_x": 0.5, "center_y": 0.5}

@@ -5,59 +5,198 @@
     anchor_x: "center"
     anchor_y: "center"
 
+    canvas.before:
+        # 1. Pinterest Island background & outline
+        Color:
+            rgba: ((app.accent_color[:3] + [0.28] if app.dockbar_bg != "theme" else app.dockbar_highlight_color) if root.is_active else (app.card_bg if app.dockbar_bg == "theme" else (0, 0, 0, 0))) if app.dockbar_style == "pinterest" else (0, 0, 0, 0)
+        RoundedRectangle:
+            pos: (self.center_x - dp(27), self.center_y - dp(27)) if app.dockbar_style == "pinterest" else (0, 0)
+            size: (dp(54), dp(54)) if app.dockbar_style == "pinterest" else (0, 0)
+            radius: [dp(27)] if app.dockbar_selection == "circles" else [dp(16)]
+        Color:
+            rgba: (app.accent_color if (root.is_active and app.dockbar_bg == "theme") else ((1, 1, 1, 0.28) if (root.is_active and app.dockbar_bg != "theme") else (app.divider_color if app.dockbar_bg == "theme" else (0, 0, 0, 0)))) if app.dockbar_style == "pinterest" else (0, 0, 0, 0)
+        Line:
+            rounded_rectangle: [self.center_x - dp(27), self.center_y - dp(27), dp(54), dp(54), dp(27) if app.dockbar_selection == "circles" else dp(16)] if app.dockbar_style == "pinterest" else [0, 0, 0, 0, 0]
+            width: 1
+
+        # 2. Incy highlight (practically full capsule height, reaching edges)
+        Color:
+            rgba: (app.accent_color[:3] + [0.26] if app.dockbar_bg != "theme" else app.dockbar_highlight_color) if (app.dockbar_style == "incy" and root.is_active and app.dockbar_selection != "none") else (0, 0, 0, 0)
+        RoundedRectangle:
+            pos: (self.x + dp(3), self.y + dp(3)) if (app.dockbar_style == "incy" and root.is_active and app.dockbar_selection != "none") else (0, 0)
+            size: (self.width - dp(6), self.height - dp(6)) if (app.dockbar_style == "incy" and root.is_active and app.dockbar_selection != "none") else (0, 0)
+            radius: [dp(26)] if app.dockbar_selection == "oval" else [dp(12)]
+        Color:
+            rgba: (1, 1, 1, 0.25) if (app.dockbar_bg != "theme" and app.dockbar_style == "incy" and root.is_active and app.dockbar_selection != "none") else (0, 0, 0, 0)
+        Line:
+            rounded_rectangle: [self.x + dp(3), self.y + dp(3), self.width - dp(6), self.height - dp(6), dp(26) if app.dockbar_selection == "oval" else dp(12)] if (app.dockbar_bg != "theme" and app.dockbar_style == "incy" and root.is_active and app.dockbar_selection != "none") else [0, 0, 0, 0, 0]
+            width: 1
+
+        # 3. Telegram highlight (large highlight matching Incy)
+        Color:
+            rgba: (app.accent_color[:3] + [0.26] if app.dockbar_bg != "theme" else app.dockbar_highlight_color) if (app.dockbar_style == "telegram" and root.is_active and app.dockbar_selection != "none") else (0, 0, 0, 0)
+        RoundedRectangle:
+            pos: (self.x + dp(3), self.y + dp(3)) if (app.dockbar_style == "telegram" and root.is_active and app.dockbar_selection != "none") else (0, 0)
+            size: (self.width - dp(6), self.height - dp(6)) if (app.dockbar_style == "telegram" and root.is_active and app.dockbar_selection != "none") else (0, 0)
+            radius: [dp(26)] if app.dockbar_selection == "oval" else [dp(14)]
+        Color:
+            rgba: (1, 1, 1, 0.25) if (app.dockbar_bg != "theme" and app.dockbar_style == "telegram" and root.is_active and app.dockbar_selection != "none") else (0, 0, 0, 0)
+        Line:
+            rounded_rectangle: [self.x + dp(3), self.y + dp(3), self.width - dp(6), self.height - dp(6), dp(26) if app.dockbar_selection == "oval" else dp(14)] if (app.dockbar_bg != "theme" and app.dockbar_style == "telegram" and root.is_active and app.dockbar_selection != "none") else [0, 0, 0, 0, 0]
+            width: 1
+
+        # 4. Impact highlight (enlarged highlight matching Incy)
+        Color:
+            rgba: (app.accent_color[:3] + [0.26] if app.dockbar_bg != "theme" else app.dockbar_highlight_color) if (app.dockbar_style == "impact" and root.is_active and app.dockbar_selection != "none") else (0, 0, 0, 0)
+        RoundedRectangle:
+            pos: (self.x + dp(4), self.y + dp(6)) if (app.dockbar_style == "impact" and root.is_active and app.dockbar_selection != "none") else (0, 0)
+            size: (self.width - dp(8), self.height - dp(12)) if (app.dockbar_style == "impact" and root.is_active and app.dockbar_selection != "none") else (0, 0)
+            radius: [dp(26)] if app.dockbar_selection == "oval" else [dp(12)]
+        Color:
+            rgba: (1, 1, 1, 0.25) if (app.dockbar_bg != "theme" and app.dockbar_style == "impact" and root.is_active and app.dockbar_selection != "none") else (0, 0, 0, 0)
+        Line:
+            rounded_rectangle: [self.x + dp(4), self.y + dp(6), self.width - dp(8), self.height - dp(12), dp(26) if app.dockbar_selection == "oval" else dp(12)] if (app.dockbar_bg != "theme" and app.dockbar_style == "impact" and root.is_active and app.dockbar_selection != "none") else [0, 0, 0, 0, 0]
+            width: 1
+
+
 <DockBar>:
     orientation: "horizontal"
     size_hint_y: None
-    height: dp(68)
-    padding: [dp(16), dp(10), dp(16), dp(12)]
-    spacing: dp(16)
+    height: dp(64) if app.dockbar_style == "impact" else dp(78)
+    padding: [max(dp(16), (self.width - dp(190)) / 2) if app.dockbar_style == "pinterest" else (dp(18) if app.dockbar_style in ("telegram", "incy") else dp(8)), dp(10) if app.dockbar_style != "impact" else 0, max(dp(16), (self.width - dp(190)) / 2) if app.dockbar_style == "pinterest" else (dp(18) if app.dockbar_style in ("telegram", "incy") else dp(8)), dp(10) if app.dockbar_style != "impact" else 0]
+    spacing: dp(14) if app.dockbar_style == "pinterest" else dp(4)
+
     canvas.before:
+        # 1. Impact style: Full-width background and top divider line
         Color:
-            rgba: (1, 1, 1, 1)
+            rgba: app.surface_color if (app.dockbar_style == "impact" and app.dockbar_bg == "theme") else (0, 0, 0, 0)
         Rectangle:
             pos: self.pos
             size: self.size
         Color:
-            rgba: (0.88, 0.90, 0.93, 1)
+            rgba: app.divider_color if app.dockbar_style == "impact" else (0, 0, 0, 0)
         Line:
-            points: [self.x, self.top, self.right, self.top]
+            points: [self.x, self.top, self.right, self.top] if app.dockbar_style == "impact" else []
             width: 1
+
+        # 2. Telegram style: Elevated rounded capsule
+        Color:
+            rgba: app.surface_color if (app.dockbar_style == "telegram" and app.dockbar_bg == "theme") else (0, 0, 0, 0)
+        RoundedRectangle:
+            pos: [self.x + dp(16), self.y + dp(10)] if app.dockbar_style == "telegram" else [0, 0]
+            size: [self.width - dp(32), self.height - dp(20)] if app.dockbar_style == "telegram" else [0, 0]
+            radius: [(self.height - dp(20)) / 2]
+
+        # 3. Incy style: Elevated capsule
+        Color:
+            rgba: app.surface_color if (app.dockbar_style == "incy" and app.dockbar_bg == "theme") else (0, 0, 0, 0)
+        RoundedRectangle:
+            pos: [self.x + dp(16), self.y + dp(10)] if app.dockbar_style == "incy" else [0, 0]
+            size: [self.width - dp(32), self.height - dp(20)] if app.dockbar_style == "incy" else [0, 0]
+            radius: [dp(16)]
 
     # 1. Dialogs (Messages)
     DockItem:
+        id: item_dialogs
         size_hint_x: 0.33
+        tab_name: "dialogs"
+        is_active: root.active_tab == "dialogs"
         on_release: root.switch_tab("dialogs")
 
-        MDIcon:
-            icon: "message-processing-outline" if root.active_tab != "dialogs" else "message-processing"
-            theme_icon_color: "Custom"
-            icon_color: (0.24, 0.48, 0.95, 1) if root.active_tab == "dialogs" else (0.55, 0.58, 0.63, 1)
-            size_hint: (None, None)
-            size: (dp(32), dp(32))
+        BoxLayout:
+            orientation: "vertical"
+            size_hint: (1, 1)
+            padding: [0, dp(4), 0, dp(4)] if (app.show_dockbar_labels and app.dockbar_style != "pinterest") else [0, 0, 0, 0]
+            spacing: dp(2) if (app.show_dockbar_labels and app.dockbar_style != "pinterest") else 0
+            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+            AnchorLayout:
+                anchor_x: "center"
+                anchor_y: "center"
+                MDIcon:
+                    icon: "message-processing-outline" if not item_dialogs.is_active else "message-processing"
+                    theme_icon_color: "Custom"
+                    icon_color: app.accent_color if item_dialogs.is_active else (app.text_color if app.dockbar_bg != "theme" else app.secondary_text_color)
+                    size_hint: (None, None)
+                    size: (dp(24), dp(24)) if (app.show_dockbar_labels and app.dockbar_style != "pinterest") else (dp(28), dp(28))
+
+            Label:
+                text: "Чаты"
+                font_size: "11sp"
+                bold: item_dialogs.is_active
+                color: app.accent_color if item_dialogs.is_active else (app.text_color if app.dockbar_bg != "theme" else app.secondary_text_color)
+                size_hint_y: None if (app.show_dockbar_labels and app.dockbar_style != "pinterest") else 0
+                height: dp(14) if (app.show_dockbar_labels and app.dockbar_style != "pinterest") else 0
+                opacity: 1 if (app.show_dockbar_labels and app.dockbar_style != "pinterest") else 0
 
     # 2. Logs Console (>/. )
     DockItem:
+        id: item_logs
         size_hint_x: 0.34
+        tab_name: "logs"
+        is_active: root.active_tab == "logs"
         on_release: root.switch_tab("logs")
 
-        Label:
-            text: ">/."
-            bold: True
-            font_size: "22sp"
-            color: (0.24, 0.48, 0.95, 1) if root.active_tab == "logs" else (0.55, 0.58, 0.63, 1)
-            size_hint: (None, None)
-            size: (dp(32), dp(32))
-            halign: "center"
-            valign: "middle"
+        BoxLayout:
+            orientation: "vertical"
+            size_hint: (1, 1)
+            padding: [0, dp(4), 0, dp(4)] if (app.show_dockbar_labels and app.dockbar_style != "pinterest") else [0, 0, 0, 0]
+            spacing: dp(2) if (app.show_dockbar_labels and app.dockbar_style != "pinterest") else 0
+            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+            AnchorLayout:
+                anchor_x: "center"
+                anchor_y: "center"
+                Label:
+                    text: ">/."
+                    bold: True
+                    font_size: "16sp" if (app.show_dockbar_labels and app.dockbar_style != "pinterest") else "22sp"
+                    color: app.accent_color if item_logs.is_active else (app.text_color if app.dockbar_bg != "theme" else app.secondary_text_color)
+                    size_hint: (None, None)
+                    size: (dp(26), dp(26)) if (app.show_dockbar_labels and app.dockbar_style != "pinterest") else (dp(28), dp(28))
+                    halign: "center"
+                    valign: "middle"
+
+            Label:
+                text: "Логи"
+                font_size: "11sp"
+                bold: item_logs.is_active
+                color: app.accent_color if item_logs.is_active else (app.text_color if app.dockbar_bg != "theme" else app.secondary_text_color)
+                size_hint_y: None if (app.show_dockbar_labels and app.dockbar_style != "pinterest") else 0
+                height: dp(14) if (app.show_dockbar_labels and app.dockbar_style != "pinterest") else 0
+                opacity: 1 if (app.show_dockbar_labels and app.dockbar_style != "pinterest") else 0
 
     # 3. Settings
     DockItem:
+        id: item_settings
         size_hint_x: 0.33
+        tab_name: "settings"
+        is_active: root.active_tab == "settings"
         on_release: root.switch_tab("settings")
 
-        MDIcon:
-            icon: "cog" if root.active_tab == "settings" else "cog-outline"
-            theme_icon_color: "Custom"
-            icon_color: (0.24, 0.48, 0.95, 1) if root.active_tab == "settings" else (0.55, 0.58, 0.63, 1)
-            size_hint: (None, None)
-            size: (dp(32), dp(32))
+        BoxLayout:
+            orientation: "vertical"
+            size_hint: (1, 1)
+            padding: [0, dp(4), 0, dp(4)] if (app.show_dockbar_labels and app.dockbar_style != "pinterest") else [0, 0, 0, 0]
+            spacing: dp(2) if (app.show_dockbar_labels and app.dockbar_style != "pinterest") else 0
+            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+            AnchorLayout:
+                anchor_x: "center"
+                anchor_y: "center"
+                MDIcon:
+                    icon: "cog" if item_settings.is_active else "cog-outline"
+                    theme_icon_color: "Custom"
+                    icon_color: app.accent_color if item_settings.is_active else (app.text_color if app.dockbar_bg != "theme" else app.secondary_text_color)
+                    size_hint: (None, None)
+                    size: (dp(24), dp(24)) if (app.show_dockbar_labels and app.dockbar_style != "pinterest") else (dp(28), dp(28))
+
+            Label:
+                text: "Настройки"
+                font_size: "11sp"
+                bold: item_settings.is_active
+                color: app.accent_color if item_settings.is_active else (app.text_color if app.dockbar_bg != "theme" else app.secondary_text_color)
+                size_hint_y: None if (app.show_dockbar_labels and app.dockbar_style != "pinterest") else 0
+                height: dp(14) if (app.show_dockbar_labels and app.dockbar_style != "pinterest") else 0
+                opacity: 1 if (app.show_dockbar_labels and app.dockbar_style != "pinterest") else 0
+

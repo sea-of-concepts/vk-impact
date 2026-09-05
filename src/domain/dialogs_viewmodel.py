@@ -59,19 +59,23 @@ class DialogsViewModel(BaseViewModel):
             if fresh:
                 self.next_from = dialogs_repo.last_next_from
                 self.has_more = bool(dialogs_repo.last_next_from)
-            items = fresh if fresh else cached
-            if self._all_dialogs:
-                self._merge_and_set_dialogs(items)
-            else:
-                for d in items:
-                    self._peer_archive_status[d.peer_id] = d.is_archived
-                    if d.peer_id in self._read_peers:
-                        d.unread_count = 0
-                        d.is_read = True
-                self._sort_and_set_all_dialogs(items)
+
+            # 1. ALWAYS populate archive status for all cached chats from SQLite
+            for d in cached:
+                self._peer_archive_status[d.peer_id] = d.is_archived
+
+            # 2. Merge cached dialogs into memory if memory was empty
+            if not self._all_dialogs and cached:
+                self._merge_and_set_dialogs(cached)
+
+            # 3. Merge fresh dialogs from server on top
+            if fresh:
+                self._merge_and_set_dialogs(fresh)
+            elif not self._all_dialogs and cached:
+                self._merge_and_set_dialogs(cached)
 
             self._apply_folder_filter()
-            self._resolve_user_styles(items)
+            self._resolve_user_styles(fresh or cached)
 
             # Auto-fill folder if needed so the screen is adequately populated
             if self.active_folder_id != "system_business" and len(self.dialogs) < self.TARGET_FOLDER_COUNT and self.has_more:
@@ -375,6 +379,99 @@ class DialogsViewModel(BaseViewModel):
             })
         self.dialogs = rv_data
 
+    def _resolve_and_add_dialog(self, peer_id: int, text: str, timestamp: int, is_out: bool, from_id: int = 0, **kwargs):
+        """Asynchronously resolves an unknown conversation from DB or VK API before adding to UI."""
+        from kivy.clock import Clock
+        msg_id = kwargs.get("message_id", 0)
+        attachments = kwargs.get("attachments", None)
+
+        async def _resolve():
+            # 1. Try local SQLite first
+            cached_d = await db_manager.get_dialog_by_peer(peer_id)
+            if cached_d:
+                return VKDialogItem(
+                    peer_id=cached_d["peer_id"],
+                    title=cached_d["title"] or f"Диалог {peer_id}",
+                    avatar_url=cached_d.get("avatar_url", ""),
+                    last_message_text=cached_d.get("last_message_text", ""),
+                    last_message_time=cached_d.get("last_message_time", 0),
+                    unread_count=cached_d.get("unread_count", 0),
+                    is_online=bool(cached_d.get("is_online", 0)),
+                    is_outgoing=bool(cached_d.get("is_outgoing", 0)),
+                    is_read=bool(cached_d.get("is_read", 1)),
+                    is_pinned=bool(cached_d.get("is_pinned", 0)),
+                    is_archived=bool(cached_d.get("is_archived", 0)),
+                    is_muted=bool(cached_d.get("is_muted", 0)),
+                    is_channel=bool(cached_d.get("is_channel", 0)),
+                    impact_style=cached_d.get("impact_style", "")
+                )
+
+            # 2. Try fetching from VK API
+            details = await dialogs_repo.fetch_conversation_details(peer_id)
+            if details:
+                return details
+
+            # 3. Fallback
+            return VKDialogItem(
+                peer_id=peer_id,
+                title=f"Диалог {peer_id}",
+                last_message_text=text,
+                last_message_time=timestamp,
+                is_outgoing=is_out,
+                is_archived=False,
+                unread_count=0 if is_out else 1
+            )
+
+        def _on_resolved(target_item: VKDialogItem):
+            self._peer_archive_status[peer_id] = target_item.is_archived
+            formatted_text = text or ("[Вложение]" if attachments else "")
+            if is_out:
+                target_item.last_message_text = f"Вы: {formatted_text}"
+            else:
+                self._read_peers.discard(peer_id)
+                target_item.last_message_text = formatted_text
+                target_item.unread_count += 1
+
+            target_item.last_message_time = timestamp
+            target_item.is_outgoing = is_out
+            target_item.is_read = is_out
+
+            run_async(dialogs_repo.save_dialog_new_message(
+                peer_id=peer_id,
+                text=target_item.last_message_text,
+                timestamp=timestamp,
+                is_out=is_out,
+                message_id=msg_id,
+                attachments=attachments,
+                is_archived=target_item.is_archived
+            ))
+
+            if not is_out and peer_id > 2000000000 and from_id > 0:
+                async def _enrich_prefix(item_ref, orig_text):
+                    prefix = await users_repo.get_user_name_prefix(from_id)
+                    if prefix:
+                        def _apply_prefix(dt):
+                            item_ref.last_message_text = f"{prefix}{orig_text}"
+                            self._apply_folder_filter()
+                        Clock.schedule_once(_apply_prefix, 0)
+                run_async(_enrich_prefix(target_item, formatted_text))
+
+            self._all_dialogs = [d for d in self._all_dialogs if d.peer_id != peer_id]
+            if target_item.is_archived:
+                self._all_dialogs.append(target_item)
+            else:
+                if target_item.is_pinned:
+                    self._all_dialogs.insert(0, target_item)
+                else:
+                    first_unpinned_idx = 0
+                    while first_unpinned_idx < len(self._all_dialogs) and self._all_dialogs[first_unpinned_idx].is_pinned:
+                        first_unpinned_idx += 1
+                    self._all_dialogs.insert(first_unpinned_idx, target_item)
+
+            self._apply_folder_filter()
+
+        self.run_task(_resolve(), on_success=_on_resolved, show_loader=False)
+
     def _on_new_message(self, peer_id: int, text: str, timestamp: int, is_out: bool, from_id: int = 0, **kwargs):
         """
         Handles incoming/outgoing new message:
@@ -393,38 +490,49 @@ class DialogsViewModel(BaseViewModel):
         if peer_id not in self._peer_last_archive_check or (now - last_check) > 300:
             self._peer_last_archive_check[peer_id] = now
             async def _check_arch():
-                is_arch = await dialogs_repo.check_conversation_archive(peer_id)
+                details = await dialogs_repo.fetch_conversation_details(peer_id)
+                if details is None:
+                    return
                 def _apply_arch(dt):
-                    self._peer_archive_status[peer_id] = is_arch
+                    self._peer_archive_status[peer_id] = details.is_archived
                     for d in self._all_dialogs:
                         if d.peer_id == peer_id:
-                            d.is_archived = is_arch
+                            d.is_archived = details.is_archived
+                            if d.title.startswith("Диалог ") and details.title and not details.title.startswith("Диалог "):
+                                d.title = details.title
+                            if not d.avatar_url and details.avatar_url:
+                                d.avatar_url = details.avatar_url
                             break
                     self._apply_folder_filter()
                 Clock.schedule_once(_apply_arch, 0)
             run_async(_check_arch())
 
-        is_archived = self._peer_archive_status.get(peer_id, False)
-
-        # 2. Find or create item
+        # 2. Find item in memory
         target_item: Optional[VKDialogItem] = None
         for item in self._all_dialogs:
             if item.peer_id == peer_id:
                 target_item = item
-                is_archived = item.is_archived or is_archived
                 self._all_dialogs.remove(item)
                 break
 
         if not target_item:
-            target_item = VKDialogItem(
-                peer_id=peer_id,
-                title=f"Диалог {peer_id}",
-                last_message_text=text,
-                last_message_time=timestamp,
-                is_outgoing=is_out,
-                is_archived=is_archived,
-                unread_count=0 if is_out else 1
-            )
+            if peer_id in self._peer_archive_status:
+                is_archived = self._peer_archive_status[peer_id]
+                target_item = VKDialogItem(
+                    peer_id=peer_id,
+                    title=f"Диалог {peer_id}",
+                    last_message_text=text,
+                    last_message_time=timestamp,
+                    is_outgoing=is_out,
+                    is_archived=is_archived,
+                    unread_count=0 if is_out else 1
+                )
+            else:
+                # Completely unknown peer: resolve via DB / API asynchronously
+                self._resolve_and_add_dialog(peer_id, text, timestamp, is_out, from_id, **kwargs)
+                return
+        else:
+            is_archived = target_item.is_archived or self._peer_archive_status.get(peer_id, False)
 
         # 3. Format message text
         formatted_text = text or ("[Вложение]" if attachments else "")

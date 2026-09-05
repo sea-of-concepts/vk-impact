@@ -77,5 +77,10 @@ class UsersRepository:
         initial = f" {ln[0]}." if ln else ""
         return f"{fn}{initial}: ".strip() + " "
 
+    def clear_cache(self) -> None:
+        """Clears the in-memory user cache."""
+        self._memory_cache.clear()
+
 
 users_repo = UsersRepository()
+

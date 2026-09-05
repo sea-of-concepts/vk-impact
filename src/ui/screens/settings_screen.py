@@ -1,32 +1,38 @@
-"""Settings screen displaying application information, version, and account options."""
+"""Main Settings Hub screen displaying clickable categories (inspired by SOVA/VK client)."""
 from kivymd.uix.screen import MDScreen
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.behaviors import ButtonBehavior
 from kivy.properties import StringProperty
-from src.core.config import config
 from src.core.constants import ScreenName
-from src.data.repositories.auth_repo import auth_repo
+
+
+class SettingsMenuItem(ButtonBehavior, BoxLayout):
+    """Clickable settings category row with icon and title."""
+    icon_name = StringProperty("")
+    title_text = StringProperty("")
+    target_screen = StringProperty("")
 
 
 class SettingsScreen(MDScreen):
-    """View displaying application settings, version, and account management."""
-
-    app_version = StringProperty("0.0.3")
-    app_name = StringProperty(config.APP_NAME)
-    user_id = StringProperty("")
+    """Main settings categories hub."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.name = ScreenName.SETTINGS
 
     def on_enter(self, *args):
-        """Refreshes settings info and synchronizes dockbar."""
+        """Synchronizes dockbar on enter."""
         if hasattr(self.ids, "dockbar"):
             self.ids.dockbar.sync_with_screen()
 
-        uid = auth_repo.current_user_id
-        self.user_id = str(uid) if uid else ""
+    def open_section(self, section_name: str):
+        """Navigates to the selected settings sub-screen."""
+        if not self.manager:
+            return
 
-    def on_logout_pressed(self):
-        """Clears auth session and returns to login screen."""
-        auth_repo.logout()
-        if self.manager:
-            self.manager.current = ScreenName.AUTH
+        if section_name == "account":
+            self.manager.current = ScreenName.SETTINGS_ACCOUNT
+        elif section_name == "personalization":
+            self.manager.current = ScreenName.SETTINGS_PERSONALIZATION
+        elif section_name == "about":
+            self.manager.current = ScreenName.SETTINGS_ABOUT

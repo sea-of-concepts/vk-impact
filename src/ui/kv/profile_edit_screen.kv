@@ -1,0 +1,538 @@
+#:kivy 2.3.0
+#:import dp kivy.metrics.dp
+
+<ProfileAccentSettingRow>:
+    orientation: "horizontal"
+    size_hint_y: None
+    height: dp(64)
+    padding: [dp(16), dp(12)]
+    spacing: dp(14)
+    canvas.before:
+        Color:
+            rgba: app.card_bg if self.state == "normal" else app.divider_color
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(16)]
+
+    on_release: self.screen.open_color_picker() if self.screen else None
+
+    # Icon
+    MDIcon:
+        icon: "palette-outline"
+        theme_icon_color: "Custom"
+        icon_color: root.accent_rgba
+        size_hint: (None, None)
+        size: (dp(26), dp(26))
+        pos_hint: {"center_y": 0.5}
+
+    # Setting Title and subtitle
+    BoxLayout:
+        orientation: "vertical"
+        spacing: dp(2)
+        pos_hint: {"center_y": 0.5}
+
+        Label:
+            text: "Цвет акцента"
+            bold: True
+            font_size: "15sp"
+            color: app.text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+        Label:
+            text: "Иконки, ссылки, выделения"
+            font_size: "12sp"
+            color: app.secondary_text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+    # Circular color preview on the right
+    Widget:
+        size_hint: (None, None)
+        size: (dp(32), dp(32))
+        pos_hint: {"center_y": 0.5}
+        canvas.before:
+            Color:
+                rgba: root.accent_rgba
+            Ellipse:
+                pos: self.pos
+                size: self.size
+            Color:
+                rgba: (1, 1, 1, 0.2) if app.theme_mode != "light" else (0, 0, 0, 0.15)
+            Line:
+                circle: (self.center_x, self.center_y, dp(16))
+                width: dp(1.5)
+
+    # Chevron
+    MDIcon:
+        icon: "chevron-right"
+        theme_icon_color: "Custom"
+        icon_color: app.secondary_text_color
+        size_hint: (None, None)
+        size: (dp(20), dp(20))
+        pos_hint: {"center_y": 0.5}
+
+
+<ProfileThemeSettingRow>:
+    orientation: "horizontal"
+    size_hint_y: None
+    height: dp(64)
+    padding: [dp(16), dp(12)]
+    spacing: dp(14)
+    canvas.before:
+        Color:
+            rgba: app.card_bg if self.state == "normal" else app.divider_color
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(16)]
+
+    on_release: self.screen.open_theme_dialog() if self.screen else None
+
+    # Icon
+    MDIcon:
+        icon: "brightness-6"
+        theme_icon_color: "Custom"
+        icon_color: app.accent_color
+        size_hint: (None, None)
+        size: (dp(26), dp(26))
+        pos_hint: {"center_y": 0.5}
+
+    # Setting Title and subtitle
+    BoxLayout:
+        orientation: "vertical"
+        spacing: dp(2)
+        pos_hint: {"center_y": 0.5}
+
+        Label:
+            text: "Тема оформления"
+            bold: True
+            font_size: "15sp"
+            color: app.text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+        Label:
+            text: "Светлая, Тёмная, AMOLED"
+            font_size: "12sp"
+            color: app.secondary_text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+    # Selected theme label preview
+    Label:
+        text: root.theme_label
+        font_size: "14sp"
+        bold: True
+        color: app.accent_color
+        size_hint_x: None
+        width: self.texture_size[0] + dp(8)
+        pos_hint: {"center_y": 0.5}
+
+    # Chevron
+    MDIcon:
+        icon: "chevron-right"
+        theme_icon_color: "Custom"
+        icon_color: app.secondary_text_color
+        size_hint: (None, None)
+        size: (dp(20), dp(20))
+        pos_hint: {"center_y": 0.5}
+
+
+<ProfileDockbarStyleSettingRow>:
+    orientation: "horizontal"
+    size_hint_y: None
+    height: dp(64)
+    padding: [dp(16), dp(12)]
+    spacing: dp(14)
+    canvas.before:
+        Color:
+            rgba: app.card_bg if self.state == "normal" else app.divider_color
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(16)]
+
+    on_release: self.screen.open_dockbar_style_dialog() if self.screen else None
+
+    # Icon
+    MDIcon:
+        icon: "dock-bottom"
+        theme_icon_color: "Custom"
+        icon_color: app.accent_color
+        size_hint: (None, None)
+        size: (dp(26), dp(26))
+        pos_hint: {"center_y": 0.5}
+
+    # Setting Title and subtitle
+    BoxLayout:
+        orientation: "vertical"
+        spacing: dp(2)
+        pos_hint: {"center_y": 0.5}
+
+        Label:
+            text: "Стиль докбара"
+            bold: True
+            font_size: "15sp"
+            color: app.text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+        Label:
+            text: "Impact, Telegram, Pinterest, Incy"
+            font_size: "12sp"
+            color: app.secondary_text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+    # Selected style label preview
+    Label:
+        text: root.style_label
+        font_size: "14sp"
+        bold: True
+        color: app.accent_color
+        size_hint_x: None
+        width: self.texture_size[0] + dp(8)
+        pos_hint: {"center_y": 0.5}
+
+    # Chevron
+    MDIcon:
+        icon: "chevron-right"
+        theme_icon_color: "Custom"
+        icon_color: app.secondary_text_color
+        size_hint: (None, None)
+        size: (dp(20), dp(20))
+        pos_hint: {"center_y": 0.5}
+
+
+<ProfileDockbarSelectionSettingRow>:
+    orientation: "horizontal"
+    size_hint_y: None
+    height: dp(64)
+    padding: [dp(16), dp(12)]
+    spacing: dp(14)
+    canvas.before:
+        Color:
+            rgba: app.card_bg if self.state == "normal" else app.divider_color
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(16)]
+
+    on_release: self.screen.open_dockbar_selection_dialog() if self.screen else None
+
+    # Icon
+    MDIcon:
+        icon: "shape-outline"
+        theme_icon_color: "Custom"
+        icon_color: app.accent_color
+        size_hint: (None, None)
+        size: (dp(26), dp(26))
+        pos_hint: {"center_y": 0.5}
+
+    # Setting Title and subtitle
+    BoxLayout:
+        orientation: "vertical"
+        spacing: dp(2)
+        pos_hint: {"center_y": 0.5}
+
+        Label:
+            text: root.title_text
+            bold: True
+            font_size: "15sp"
+            color: app.text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+        Label:
+            text: "Форма выделения или кнопок"
+            font_size: "12sp"
+            color: app.secondary_text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+    # Selected selection label preview
+    Label:
+        text: root.selection_label
+        font_size: "14sp"
+        bold: True
+        color: app.accent_color
+        size_hint_x: None
+        width: self.texture_size[0] + dp(8)
+        pos_hint: {"center_y": 0.5}
+
+    # Chevron
+    MDIcon:
+        icon: "chevron-right"
+        theme_icon_color: "Custom"
+        icon_color: app.secondary_text_color
+        size_hint: (None, None)
+        size: (dp(20), dp(20))
+        pos_hint: {"center_y": 0.5}
+
+
+<ProfileDockbarBgSettingRow>:
+    orientation: "horizontal"
+    size_hint_y: None
+    height: dp(64)
+    padding: [dp(16), dp(12)]
+    spacing: dp(14)
+    canvas.before:
+        Color:
+            rgba: app.card_bg if self.state == "normal" else app.divider_color
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(16)]
+
+    on_release: self.screen.open_dockbar_bg_dialog() if self.screen else None
+
+    # Icon
+    MDIcon:
+        icon: "palette-outline"
+        theme_icon_color: "Custom"
+        icon_color: app.accent_color
+        size_hint: (None, None)
+        size: (dp(26), dp(26))
+        pos_hint: {"center_y": 0.5}
+
+    # Setting Title and subtitle
+    BoxLayout:
+        orientation: "vertical"
+        spacing: dp(2)
+        pos_hint: {"center_y": 0.5}
+
+        Label:
+            text: "Докбар: фон"
+            bold: True
+            font_size: "15sp"
+            color: app.text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+        Label:
+            text: "Согласно теме, Liquid glass, Glassy ice"
+            font_size: "12sp"
+            color: app.secondary_text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+    # Selected background label preview
+    Label:
+        text: root.bg_label
+        font_size: "14sp"
+        bold: True
+        color: app.accent_color
+        size_hint_x: None
+        width: self.texture_size[0] + dp(8)
+        pos_hint: {"center_y": 0.5}
+
+    # Chevron
+    MDIcon:
+        icon: "chevron-right"
+        theme_icon_color: "Custom"
+        icon_color: app.secondary_text_color
+        size_hint: (None, None)
+        size: (dp(20), dp(20))
+        pos_hint: {"center_y": 0.5}
+
+
+<ProfileDockbarLabelsSettingRow>:
+    orientation: "horizontal"
+    size_hint_y: None
+    height: dp(64)
+    padding: [dp(16), dp(12)]
+    spacing: dp(14)
+    disabled: root.is_disabled
+    opacity: 0.5 if root.is_disabled else 1.0
+    canvas.before:
+        Color:
+            rgba: app.card_bg if self.state == "normal" else app.divider_color
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(16)]
+
+    on_release: (self.screen.toggle_dockbar_labels() if not root.is_disabled else None) if self.screen else None
+
+    # Icon
+    MDIcon:
+        icon: "format-text"
+        theme_icon_color: "Custom"
+        icon_color: app.accent_color if not root.is_disabled else app.secondary_text_color
+        size_hint: (None, None)
+        size: (dp(26), dp(26))
+        pos_hint: {"center_y": 0.5}
+
+    # Setting Title and subtitle
+    BoxLayout:
+        orientation: "vertical"
+        spacing: dp(2)
+        pos_hint: {"center_y": 0.5}
+
+        Label:
+            text: "Докбар: названия разделов"
+            bold: True
+            font_size: "15sp"
+            color: app.text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+        Label:
+            text: "Недоступно для Pinterest" if root.is_disabled else "Отображать подписи под иконками"
+            font_size: "12sp"
+            color: app.secondary_text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+    MDSwitch:
+        disabled: root.is_disabled
+        active: root.is_active and not root.is_disabled
+        pos_hint: {"center_y": 0.5}
+        on_active: (root.screen.set_dockbar_labels(self.active) if not root.is_disabled else None) if root.screen else None
+
+
+<ProfileEditScreen>:
+    md_bg_color: app.bg_color
+
+    BoxLayout:
+        orientation: "vertical"
+
+        # Top App Bar
+        MDTopAppBar:
+            type: "small"
+            theme_bg_color: "Custom"
+            md_bg_color: app.surface_color
+
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "arrow-left"
+                    theme_icon_color: "Custom"
+                    icon_color: app.text_color
+                    on_release: root.on_back_pressed()
+
+            MDTopAppBarTitle:
+                text: "Настройки профиля"
+                theme_text_color: "Custom"
+                text_color: app.text_color
+
+        # Content Form
+        ScrollView:
+            do_scroll_x: False
+            do_scroll_y: True
+
+            BoxLayout:
+                orientation: "vertical"
+                size_hint_y: None
+                height: self.minimum_height
+                padding: [dp(20), dp(20)]
+                spacing: dp(16)
+
+                # Card with name input
+                BoxLayout:
+                    orientation: "vertical"
+                    size_hint_y: None
+                    height: self.minimum_height
+                    padding: [dp(16), dp(16)]
+                    spacing: dp(14)
+                    canvas.before:
+                        Color:
+                            rgba: app.card_bg
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [dp(16)]
+
+                    MDLabel:
+                        text: "Название профиля:"
+                        font_style: "Body"
+                        role: "medium"
+                        bold: True
+                        theme_text_color: "Custom"
+                        text_color: app.text_color
+                        size_hint_y: None
+                        height: dp(24)
+
+                    MDTextField:
+                        mode: "outlined"
+                        size_hint_x: 1
+                        text: root.profile_name
+                        on_text: root.profile_name = self.text
+                        MDTextFieldHintText:
+                            text: "Название"
+
+                # Setting: Accent Color Row
+                ProfileAccentSettingRow:
+                    id: accent_setting_row
+                    screen: root
+                    accent_rgba: root.accent_color_rgba
+
+                # Setting: Theme Mode Row
+                ProfileThemeSettingRow:
+                    id: theme_setting_row
+                    screen: root
+                    theme_label: root.theme_mode_label
+
+                # Setting: Dockbar Style Row
+                ProfileDockbarStyleSettingRow:
+                    id: dockbar_style_setting_row
+                    screen: root
+                    style_label: root.dockbar_style_label
+
+                # Setting: Dockbar Selection / Shape Row
+                ProfileDockbarSelectionSettingRow:
+                    id: dockbar_selection_setting_row
+                    screen: root
+                    title_text: root.dockbar_selection_title
+                    selection_label: root.dockbar_selection_label
+
+                # Setting: Dockbar Background Shader Row
+                ProfileDockbarBgSettingRow:
+                    id: dockbar_bg_setting_row
+                    screen: root
+                    bg_label: root.dockbar_bg_label
+
+                # Setting: Dockbar Labels Toggle Row
+                ProfileDockbarLabelsSettingRow:
+                    id: dockbar_labels_setting_row
+                    screen: root
+                    is_active: root.dockbar_show_labels
+
+                # Error banner
+                MDLabel:
+                    text: root.error_message
+                    theme_text_color: "Custom"
+                    text_color: (0.9, 0.2, 0.2, 1)
+                    font_style: "Body"
+                    role: "small"
+                    size_hint_y: None
+                    height: dp(24) if root.error_message else 0
+                    opacity: 1 if root.error_message else 0
+
+                # Save Button
+                MDButton:
+                    style: "filled"
+                    size_hint_x: 1
+                    size_hint_y: None
+                    height: dp(46)
+                    theme_bg_color: "Custom"
+                    md_bg_color: app.accent_color
+                    on_release: root.on_save_pressed()
+                    MDButtonIcon:
+                        icon: "content-save-outline"
+                    MDButtonText:
+                        text: "Сохранить"
+                        pos_hint: {"center_x": 0.5, "center_y": 0.5}

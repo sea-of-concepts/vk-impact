@@ -1,0 +1,131 @@
+#:kivy 2.3.0
+#:import dp kivy.metrics.dp
+
+<ThemeOptionItem>:
+    orientation: "horizontal"
+    size_hint_y: None
+    height: dp(56)
+    padding: [dp(12), dp(8)]
+    spacing: dp(14)
+    canvas.before:
+        Color:
+            rgba: (0.94, 0.95, 0.97, 0.6) if self.state == "down" else (0, 0, 0, 0)
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(12)]
+
+    MDIcon:
+        icon: root.icon_name
+        theme_icon_color: "Custom"
+        icon_color: app.accent_color if root.is_selected else app.secondary_text_color
+        size_hint: (None, None)
+        size: (dp(24), dp(24))
+        pos_hint: {"center_y": 0.5}
+
+    BoxLayout:
+        orientation: "vertical"
+        spacing: dp(1)
+        pos_hint: {"center_y": 0.5}
+
+        Label:
+            text: root.title_text
+            bold: True
+            font_size: "15sp"
+            color: app.text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+        Label:
+            text: root.desc_text
+            font_size: "11sp"
+            color: app.secondary_text_color
+            halign: "left"
+            valign: "middle"
+            text_size: (self.width, None)
+
+    MDIcon:
+        icon: "radiobox-marked" if root.is_selected else "radiobox-blank"
+        theme_icon_color: "Custom"
+        icon_color: app.accent_color if root.is_selected else (0.5, 0.53, 0.58, 0.4)
+        size_hint: (None, None)
+        size: (dp(22), dp(22))
+        pos_hint: {"center_y": 0.5}
+
+
+<ThemeModeDialog>:
+    size_hint: (0.88, None)
+    height: dp(310)
+    background_color: (0, 0, 0, 0.5)
+
+    BoxLayout:
+        orientation: "vertical"
+        size_hint: (1, 1)
+        padding: [dp(20), dp(18)]
+        spacing: dp(10)
+        canvas.before:
+            Color:
+                rgba: app.card_bg
+            RoundedRectangle:
+                pos: self.pos
+                size: self.size
+                radius: [dp(22)]
+
+        Label:
+            text: "Тема оформления"
+            font_size: "18sp"
+            bold: True
+            color: app.text_color
+            size_hint_y: None
+            height: dp(26)
+            halign: "left"
+            text_size: (self.width, None)
+
+        BoxLayout:
+            orientation: "vertical"
+            size_hint_y: None
+            height: self.minimum_height
+            spacing: dp(4)
+
+            ThemeOptionItem:
+                mode_key: "light"
+                title_text: "Светлая"
+                desc_text: "Стандартная дневная тема"
+                icon_name: "white-balance-sunny"
+                is_selected: root.selected_mode == "light"
+                dialog: root
+
+            ThemeOptionItem:
+                mode_key: "dark"
+                title_text: "Тёмная"
+                desc_text: "Графитовый стиль веб-версии VK"
+                icon_name: "moon-waning-crescent"
+                is_selected: root.selected_mode == "dark"
+                dialog: root
+
+            ThemeOptionItem:
+                mode_key: "amoled"
+                title_text: "AMOLED"
+                desc_text: "Глубокий чёрный для OLED дисплеев"
+                icon_name: "circle-slice-8"
+                is_selected: root.selected_mode == "amoled"
+                dialog: root
+
+        Widget:
+            size_hint_y: 1
+
+        BoxLayout:
+            orientation: "horizontal"
+            size_hint_y: None
+            height: dp(40)
+
+            Widget:
+                size_hint_x: 1
+
+            MDButton:
+                style: "text"
+                on_release: root.dismiss()
+                MDButtonText:
+                    text: "Закрыть"
+                    pos_hint: {"center_x": 0.5, "center_y": 0.5}

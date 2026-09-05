@@ -1,0 +1,82 @@
+#:kivy 2.3.0
+#:import dp kivy.metrics.dp
+
+<AboutSettingsScreen>:
+    md_bg_color: app.bg_color
+
+    BoxLayout:
+        orientation: "vertical"
+
+        # Top App Bar
+        MDTopAppBar:
+            type: "small"
+            theme_bg_color: "Custom"
+            md_bg_color: app.surface_color
+
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "arrow-left"
+                    theme_icon_color: "Custom"
+                    icon_color: app.text_color
+                    on_release: root.on_back_pressed()
+
+            MDTopAppBarTitle:
+                text: "О приложении"
+                theme_text_color: "Custom"
+                text_color: app.text_color
+
+        # Content List
+        ScrollView:
+            do_scroll_x: False
+            do_scroll_y: True
+
+            BoxLayout:
+                orientation: "vertical"
+                size_hint_y: None
+                height: self.minimum_height
+                padding: [dp(16), dp(16)]
+                spacing: dp(14)
+
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: dp(68)
+                    padding: [dp(16), dp(14)]
+                    spacing: dp(14)
+                    canvas.before:
+                        Color:
+                            rgba: app.card_bg
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [dp(16)]
+
+                    MDIcon:
+                        icon: "information-outline"
+                        theme_icon_color: "Custom"
+                        icon_color: app.accent_color
+                        size_hint: (None, None)
+                        size: (dp(26), dp(26))
+                        pos_hint: {"center_y": 0.5}
+
+                    BoxLayout:
+                        orientation: "vertical"
+                        spacing: dp(2)
+                        pos_hint: {"center_y": 0.5}
+
+                        Label:
+                            text: "Версия"
+                            bold: True
+                            font_size: "15sp"
+                            color: app.text_color
+                            halign: "left"
+                            valign: "middle"
+                            text_size: (self.width, None)
+
+                        Label:
+                            text: root.app_name + " v" + root.app_version
+                            font_size: "13sp"
+                            color: app.secondary_text_color
+                            halign: "left"
+                            valign: "middle"
+                            text_size: (self.width, None)

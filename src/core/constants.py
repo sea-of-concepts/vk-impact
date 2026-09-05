@@ -24,6 +24,14 @@ class ScreenName(str, Enum):
     FEED = "feed_screen"
     PROFILE = "profile_screen"
     SETTINGS = "settings_screen"
+    SETTINGS_ACCOUNT = "settings_account_screen"
+    SETTINGS_PERSONALIZATION = "settings_personalization_screen"
+    SETTINGS_ABOUT = "settings_about_screen"
+    ACCOUNT_SELECTION = "account_selection_screen"
+    PROFILE_EDIT = "profile_edit_screen"
+
+
+
 
 
 class ThemePalette(str, Enum):

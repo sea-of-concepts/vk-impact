@@ -5,16 +5,16 @@
     orientation: "vertical"
     size_hint_y: None
     height: root.row_size[1]
-    padding: [dp(12), dp(4)]
+    padding: [dp(12), dp(6)]
     spacing: dp(2)
     canvas.before:
         Color:
-            rgba: (0.98, 0.98, 0.99, 1) if not root.is_expanded else (0.94, 0.95, 0.97, 1)
+            rgba: app.card_bg if not root.is_expanded else app.surface_color
         Rectangle:
             pos: self.pos
             size: self.size
         Color:
-            rgba: (0.88, 0.89, 0.92, 1)
+            rgba: app.divider_color
         Line:
             points: [self.x, self.y, self.right, self.y]
             width: 1
@@ -28,7 +28,7 @@
 
         Label:
             text: root.time_str
-            color: (0.5, 0.53, 0.58, 1)
+            color: app.secondary_text_color
             font_size: "11sp"
             size_hint_x: None
             width: dp(85)
@@ -58,7 +58,7 @@
         MDIconButton:
             icon: "chevron-up" if root.is_expanded else "chevron-down"
             theme_icon_color: "Custom"
-            icon_color: (0.35, 0.38, 0.44, 1)
+            icon_color: app.secondary_text_color
             size_hint: (None, None)
             size: (dp(26), dp(22))
             pos_hint: {"center_y": 0.5}
@@ -67,7 +67,7 @@
     # 2. Main Method / Message
     Label:
         text: root.message
-        color: (0.85, 0.2, 0.2, 1) if root.level == "ERROR" else (0.12, 0.14, 0.18, 1)
+        color: (0.9, 0.25, 0.25, 1) if root.level == "ERROR" else app.text_color
         font_size: "13sp"
         bold: True
         size_hint_y: None
@@ -81,7 +81,7 @@
     # 3. Collapsed Preview
     Label:
         text: root.preview_text
-        color: (0.45, 0.48, 0.52, 1)
+        color: app.secondary_text_color
         font_size: "12sp"
         size_hint_y: None
         height: dp(18) if not root.is_expanded else 0
@@ -105,87 +105,107 @@
             readonly: True
             multiline: True
             font_size: "11sp"
-            background_color: (0.92, 0.93, 0.95, 1)
-            foreground_color: (0.1, 0.12, 0.15, 1)
+            background_color: app.input_bg
+            foreground_color: app.text_color
+            cursor_color: app.accent_color
             size_hint: (1, 1)
 
 
 <LogsScreen>:
-    md_bg_color: self.theme_cls.backgroundColor
+    md_bg_color: app.bg_color
 
-    BoxLayout:
-        orientation: "vertical"
-
-        # Top Bar (no back arrow needed, bottom DockBar handles navigation)
-        MDTopAppBar:
-            type: "small"
-
-            MDTopAppBarTitle:
-                text: "Консоль логирования (>/. )"
-
-            MDTopAppBarTrailingButtonContainer:
-                MDIconButton:
-                    icon: "trash-can-outline"
-                    on_release: root.clear_logs()
-
-        # Category filter bar
+    FloatLayout:
         BoxLayout:
-            orientation: "horizontal"
-            size_hint_y: None
-            height: dp(42)
-            padding: [dp(12), dp(4)]
-            spacing: dp(8)
+            orientation: "vertical"
+            pos_hint: {"x": 0, "y": 0}
+            size_hint: (1, 1)
 
-            MDButton:
-                style: "filled" if root.active_category == "Все" else "tonal"
-                size_hint_x: 0.25
-                on_release: root.filter_category("Все")
-                MDButtonText:
-                    text: "Все"
-                    pos_hint: {"center_x": 0.5, "center_y": 0.5}
+            # Top Bar (no back arrow needed, bottom DockBar handles navigation)
+            MDTopAppBar:
+                type: "small"
+                theme_bg_color: "Custom"
+                md_bg_color: app.surface_color
 
-            MDButton:
-                style: "filled" if root.active_category == "API" else "tonal"
-                size_hint_x: 0.25
-                on_release: root.filter_category("API")
-                MDButtonText:
-                    text: "API"
-                    pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                MDTopAppBarTitle:
+                    text: "Консоль логирования (>/. )"
+                    theme_text_color: "Custom"
+                    text_color: app.text_color
 
-            MDButton:
-                style: "filled" if root.active_category == "LongPoll" else "tonal"
-                size_hint_x: 0.25
-                on_release: root.filter_category("LongPoll")
-                MDButtonText:
-                    text: "LongPoll"
-                    pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                MDTopAppBarTrailingButtonContainer:
+                    MDIconButton:
+                        icon: "trash-can-outline"
+                        theme_icon_color: "Custom"
+                        icon_color: app.text_color
+                        on_release: root.clear_logs()
 
-            MDButton:
-                style: "filled" if root.active_category == "Media" else "tonal"
-                size_hint_x: 0.25
-                on_release: root.filter_category("Media")
-                MDButtonText:
-                    text: "Media"
-                    pos_hint: {"center_x": 0.5, "center_y": 0.5}
-
-        # Log Stream RecycleView with strictly bounded row heights
-        RecycleView:
-            id: rv_logs
-            viewclass: "LogRowItem"
-            data: root.logs
-            scroll_y: 0
-            scroll_type: ['bars', 'content']
-            bar_width: dp(4)
-
-            RecycleBoxLayout:
-                key_size: "row_size"
-                default_size: None, dp(68)
-                default_size_hint: 1, None
+            # Category filter bar
+            BoxLayout:
+                orientation: "horizontal"
                 size_hint_y: None
-                height: self.minimum_height
-                orientation: "vertical"
+                height: dp(42)
+                padding: [dp(12), dp(4)]
+                spacing: dp(8)
+
+                MDButton:
+                    style: "filled" if root.active_category == "Все" else "tonal"
+                    theme_bg_color: "Custom" if root.active_category == "Все" else "Primary"
+                    md_bg_color: app.accent_color if root.active_category == "Все" else (0, 0, 0, 0)
+                    size_hint_x: 0.25
+                    on_release: root.filter_category("Все")
+                    MDButtonText:
+                        text: "Все"
+                        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+                MDButton:
+                    style: "filled" if root.active_category == "API" else "tonal"
+                    theme_bg_color: "Custom" if root.active_category == "API" else "Primary"
+                    md_bg_color: app.accent_color if root.active_category == "API" else (0, 0, 0, 0)
+                    size_hint_x: 0.25
+                    on_release: root.filter_category("API")
+                    MDButtonText:
+                        text: "API"
+                        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+                MDButton:
+                    style: "filled" if root.active_category == "LongPoll" else "tonal"
+                    theme_bg_color: "Custom" if root.active_category == "LongPoll" else "Primary"
+                    md_bg_color: app.accent_color if root.active_category == "LongPoll" else (0, 0, 0, 0)
+                    size_hint_x: 0.25
+                    on_release: root.filter_category("LongPoll")
+                    MDButtonText:
+                        text: "LongPoll"
+                        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+                MDButton:
+                    style: "filled" if root.active_category == "Media" else "tonal"
+                    theme_bg_color: "Custom" if root.active_category == "Media" else "Primary"
+                    md_bg_color: app.accent_color if root.active_category == "Media" else (0, 0, 0, 0)
+                    size_hint_x: 0.25
+                    on_release: root.filter_category("Media")
+                    MDButtonText:
+                        text: "Media"
+                        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+            # Log Stream RecycleView with strictly bounded row heights
+            RecycleView:
+                id: rv_logs
+                viewclass: "LogRowItem"
+                data: root.logs
+                scroll_y: 0
+                scroll_type: ['bars', 'content']
+                bar_width: dp(4)
+
+                RecycleBoxLayout:
+                    key_size: "row_size"
+                    default_size: None, dp(68)
+                    default_size_hint: 1, None
+                    size_hint_y: None
+                    height: self.minimum_height
+                    orientation: "vertical"
+                    padding: [0, 0, 0, dp(88)]
 
         # Bottom DockBar (Сообщения | >/. | Настройки)
         DockBar:
             id: dockbar
             active_tab: "logs"
+            pos_hint: {"center_x": 0.5, "y": 0}
