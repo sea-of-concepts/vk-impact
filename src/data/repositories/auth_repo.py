@@ -254,11 +254,12 @@ class AuthRepository:
             return ("select", remaining)
 
     def logout(self) -> None:
-        """Clears active token and current user."""
+        """Clears active token, current user, and emits AUTH_LOGOUT."""
         api_client.set_token("")
         self._current_user_id = None
         users_repo.clear_cache()
         self.security_mgr.clear_session()
+        event_bus.emit(EventType.AUTH_LOGOUT)
 
 
 

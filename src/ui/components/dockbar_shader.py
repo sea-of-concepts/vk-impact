@@ -7,7 +7,10 @@ from kivy.graphics.texture import Texture
 from kivy.graphics.opengl import glCopyTexSubImage2D, GL_TEXTURE_2D
 from kivy.metrics import dp
 from kivymd.app import MDApp
+from kivy.utils import platform
 from src.core.logger import logger
+
+IS_MOBILE = platform in ("android", "ios")
 
 SHADER_VS = """
 #ifdef GL_ES
@@ -43,12 +46,12 @@ varying vec2 tex_coord0;
 uniform sampler2D texture0;
 uniform vec2 resolution;
 uniform float time;
-uniform vec4 u_capsule; // x, y, w, h
+uniform vec4 u_capsule; // local x, y, w, h
 uniform float u_radius;
-uniform int u_style;    // 0: impact, 1: telegram, 2: incy, 3: pinterest
-uniform vec4 u_island1; // x, y, w, h for pinterest dialogs
-uniform vec4 u_island2; // x, y, w, h for pinterest logs
-uniform vec4 u_island3; // x, y, w, h for pinterest settings
+uniform float u_style;  // 0: impact, 1: telegram, 2: incy, 3: pinterest
+uniform vec4 u_island1; // local x, y, w, h for pinterest dialogs
+uniform vec4 u_island2; // local x, y, w, h for pinterest logs
+uniform vec4 u_island3; // local x, y, w, h for pinterest settings
 uniform vec4 u_accent;
 uniform vec4 u_surface_color;
 uniform float u_is_dark;
@@ -59,7 +62,7 @@ float roundedBoxSDF(vec2 p, vec2 b, float r) {
 }
 
 float getDist(vec2 coord) {
-    if (u_style == 3) {
+    if (u_style > 2.5) {
         float d1 = roundedBoxSDF(coord - (u_island1.xy + u_island1.zw * 0.5), u_island1.zw * 0.5, u_radius);
         float d2 = roundedBoxSDF(coord - (u_island2.xy + u_island2.zw * 0.5), u_island2.zw * 0.5, u_radius);
         float d3 = roundedBoxSDF(coord - (u_island3.xy + u_island3.zw * 0.5), u_island3.zw * 0.5, u_radius);
@@ -70,80 +73,73 @@ float getDist(vec2 coord) {
 }
 
 void main(void) {
-    float dist = getDist(gl_FragCoord.xy);
+    vec2 p = tex_coord0 * resolution;
+    float dist = getDist(p);
 
     // Anti-aliased outer edge mask
     float alpha = 1.0 - smoothstep(0.0, 1.5, dist);
     if (alpha <= 0.001) discard;
 
-    vec2 texel = 1.0 / max(resolution, vec2(1.0));
+    float depth = max(-dist, 0.0);
 
-    // Normal calculation from SDF gradient at the glass bevel
+    // 2D outward gradient from SDF (unit-length normal pointing outward from boundary)
     vec2 eps = vec2(1.0, 0.0);
-    float d_dx = getDist(gl_FragCoord.xy + eps.xy) - getDist(gl_FragCoord.xy - eps.xy);
-    float d_dy = getDist(gl_FragCoord.xy + eps.yx) - getDist(gl_FragCoord.xy - eps.yx);
-    vec2 edge_grad = normalize(vec2(d_dx, d_dy) + vec2(0.0001));
+    float gx = getDist(p + eps.xy) - getDist(p - eps.xy);
+    float gy = getDist(p + eps.yx) - getDist(p - eps.yx);
+    vec2 edge_grad = normalize(vec2(gx, gy) + vec2(0.00001));
 
-    float edge_depth = max(-dist, 0.0);
-    float bevel_t = clamp(edge_depth / 6.0, 0.0, 1.0);
-    float bevel_curve = cos(bevel_t * 1.57079); // 1.0 at edge, 0.0 inside
+    // Curvature radius R for each style:
+    // Impact: 14px edge bevel
+    // Telegram: capsule height / 2 (29px)
+    // Incy: 16px corner bevel
+    // Pinterest: 27px island radius
+    float R = (u_style < 0.5) ? 14.0 : max(u_radius, 1.0);
+    float t = clamp(depth / R, 0.0, 1.0);
 
-    // Subtle edge lens refraction
-    vec2 edge_refr = -edge_grad * bevel_curve * 5.0 * texel;
+    // Smooth convex lens slope (0 in flat center, 1 at edge)
+    float slope = sin((1.0 - t) * 1.5707963);
 
-    // Multi-tap frosted glass blur (17 samples)
-    vec2 base_uv = clamp(tex_coord0 + edge_refr, 0.002, 0.998);
-    vec3 blurred = texture2D(texture0, base_uv).rgb * 0.18;
+    // Physical lens displacement: points near edge bend inwards towards lens center
+    // 6.0px max displacement gives clean, elegant optical warping without tearing
+    vec2 refr = -edge_grad * slope * (6.0 / max(resolution, vec2(1.0)));
 
-    float r1 = 3.5;
-    blurred += texture2D(texture0, clamp(base_uv + vec2( 0.0,  1.0) * r1 * texel, 0.002, 0.998)).rgb * 0.065;
-    blurred += texture2D(texture0, clamp(base_uv + vec2( 0.0, -1.0) * r1 * texel, 0.002, 0.998)).rgb * 0.065;
-    blurred += texture2D(texture0, clamp(base_uv + vec2( 1.0,  0.0) * r1 * texel, 0.002, 0.998)).rgb * 0.065;
-    blurred += texture2D(texture0, clamp(base_uv + vec2(-1.0,  0.0) * r1 * texel, 0.002, 0.998)).rgb * 0.065;
-    blurred += texture2D(texture0, clamp(base_uv + vec2( 0.707,  0.707) * r1 * texel, 0.002, 0.998)).rgb * 0.055;
-    blurred += texture2D(texture0, clamp(base_uv + vec2(-0.707,  0.707) * r1 * texel, 0.002, 0.998)).rgb * 0.055;
-    blurred += texture2D(texture0, clamp(base_uv + vec2( 0.707, -0.707) * r1 * texel, 0.002, 0.998)).rgb * 0.055;
-    blurred += texture2D(texture0, clamp(base_uv + vec2(-0.707, -0.707) * r1 * texel, 0.002, 0.998)).rgb * 0.055;
+    // Subtle natural chromatic dispersion (approx 1.8% dispersion, no image tripling)
+    vec2 uv_r = clamp(tex_coord0 + refr * 1.018, 0.002, 0.998);
+    vec2 uv_g = clamp(tex_coord0 + refr * 1.000, 0.002, 0.998);
+    vec2 uv_b = clamp(tex_coord0 + refr * 0.982, 0.002, 0.998);
 
-    float r2 = 7.0;
-    blurred += texture2D(texture0, clamp(base_uv + vec2( 0.38,  0.92) * r2 * texel, 0.002, 0.998)).rgb * 0.045;
-    blurred += texture2D(texture0, clamp(base_uv + vec2(-0.38,  0.92) * r2 * texel, 0.002, 0.998)).rgb * 0.045;
-    blurred += texture2D(texture0, clamp(base_uv + vec2( 0.38, -0.92) * r2 * texel, 0.002, 0.998)).rgb * 0.045;
-    blurred += texture2D(texture0, clamp(base_uv + vec2(-0.38, -0.92) * r2 * texel, 0.002, 0.998)).rgb * 0.045;
-    blurred += texture2D(texture0, clamp(base_uv + vec2( 0.92,  0.38) * r2 * texel, 0.002, 0.998)).rgb * 0.045;
-    blurred += texture2D(texture0, clamp(base_uv + vec2(-0.92,  0.38) * r2 * texel, 0.002, 0.998)).rgb * 0.045;
-    blurred += texture2D(texture0, clamp(base_uv + vec2( 0.92, -0.38) * r2 * texel, 0.002, 0.998)).rgb * 0.045;
-    blurred += texture2D(texture0, clamp(base_uv + vec2(-0.92, -0.38) * r2 * texel, 0.002, 0.998)).rgb * 0.045;
+    // Optical sampling of background
+    float r = texture2D(texture0, uv_r).r;
+    float g = texture2D(texture0, uv_g).g;
+    float b = texture2D(texture0, uv_b).b;
+    vec3 col = vec3(r, g, b);
 
-    // Specular rim calculation (Apple iOS 18 Control Center style)
-    vec2 light_dir_2d = normalize(vec2(-0.30, 0.95));
-    float light_align = max(0.0, dot(-edge_grad, light_dir_2d));
-    float rim_bright = 0.45 + 0.55 * light_align;
+    // Normalized coordinates across capsule/dockbar for subtle depth
+    vec2 norm_pos = (p - u_capsule.xy) / max(u_capsule.zw, vec2(1.0));
+    norm_pos = clamp(norm_pos, 0.0, 1.0);
 
-    float inner_rim = smoothstep(2.8, 0.6, edge_depth) * smoothstep(0.0, 0.6, edge_depth);
-    float edge_aa = smoothstep(1.5, 0.0, abs(dist));
-
-    // Translucent glass tint & gradient
-    float v_norm = clamp((gl_FragCoord.y - u_capsule.y) / max(u_capsule.w, 1.0), 0.0, 1.0);
-    vec3 col = vec3(0.0);
-
+    // Pure transparent optical glass body
     if (u_is_dark > 0.5) {
-        // Dark mode: smoky frosted acrylic glass
-        vec3 glass_tint = vec3(0.16, 0.18, 0.22) + vec3(0.05, 0.05, 0.07) * v_norm;
-        col = mix(blurred, glass_tint, 0.52);
-        col += vec3(1.0) * inner_rim * rim_bright * 0.35;
-        col = mix(col, vec3(1.0), edge_aa * 0.20 * rim_bright);
+        col = mix(col, col * 0.93 + vec3(0.01, 0.02, 0.04), 0.08);
+        float bottom_ao = smoothstep(12.0, 0.0, depth) * smoothstep(0.55, 0.0, norm_pos.y);
+        col *= (1.0 - bottom_ao * 0.12);
     } else {
-        // Light mode: milky frosted liquid glass
-        vec3 glass_tint = vec3(0.95, 0.96, 0.98) + vec3(0.03, 0.03, 0.03) * v_norm;
-        col = mix(blurred, glass_tint, 0.56);
-        col += vec3(1.0) * inner_rim * rim_bright * 0.45;
-        col = mix(col, vec3(1.0), edge_aa * 0.32 * rim_bright);
+        col = mix(col, vec3(0.98, 0.99, 1.0), 0.05);
+        float bottom_ao = smoothstep(12.0, 0.0, depth) * smoothstep(0.55, 0.0, norm_pos.y);
+        col *= (1.0 - bottom_ao * 0.08);
     }
 
-    // Subtle breathing satin sheen
-    float sheen = sin(time * 0.6) * 0.015;
-    col += vec3(sheen);
+    // Crisp 1.2px glass rim outline
+    float rim = smoothstep(1.3, 0.0, abs(dist));
+    float rim_direction = 0.35 + 0.65 * max(0.0, -edge_grad.y);
+    float rim_intensity = rim * 0.45 * rim_direction;
+
+    // Hairline top bevel gleam
+    float top_bevel = smoothstep(2.5, 0.8, depth) * smoothstep(0.0, 0.8, depth) * max(0.0, -edge_grad.y);
+    col += vec3(1.0) * top_bevel * 0.18;
+
+    // Apply clean glass rim
+    col = mix(col, vec3(1.0), rim_intensity);
 
     gl_FragColor = vec4(col, alpha);
 }
@@ -160,10 +156,10 @@ varying vec2 tex_coord0;
 uniform sampler2D texture0;
 uniform vec2 resolution;
 uniform float time;
-uniform vec4 u_capsule;
+uniform vec4 u_capsule; // local x, y, w, h
 uniform float u_radius;
-uniform int u_style;
-uniform vec4 u_island1;
+uniform float u_style;  // 0: impact, 1: telegram, 2: incy, 3: pinterest
+uniform vec4 u_island1; // local x, y, w, h
 uniform vec4 u_island2;
 uniform vec4 u_island3;
 uniform vec4 u_accent;
@@ -176,7 +172,7 @@ float roundedBoxSDF(vec2 p, vec2 b, float r) {
 }
 
 float getDist(vec2 coord) {
-    if (u_style == 3) {
+    if (u_style > 2.5) {
         float d1 = roundedBoxSDF(coord - (u_island1.xy + u_island1.zw * 0.5), u_island1.zw * 0.5, u_radius);
         float d2 = roundedBoxSDF(coord - (u_island2.xy + u_island2.zw * 0.5), u_island2.zw * 0.5, u_radius);
         float d3 = roundedBoxSDF(coord - (u_island3.xy + u_island3.zw * 0.5), u_island3.zw * 0.5, u_radius);
@@ -258,7 +254,8 @@ vec3 voronoi(vec2 x) {
 }
 
 void main(void) {
-    float dist = getDist(gl_FragCoord.xy);
+    vec2 p_loc = tex_coord0 * resolution;
+    float dist = getDist(p_loc);
 
     float alpha = 1.0 - smoothstep(0.0, 1.5, dist);
     if (alpha <= 0.001) discard;
@@ -266,7 +263,7 @@ void main(void) {
     vec2 texel = 1.0 / max(resolution, vec2(1.0));
 
     // Voronoi cell facets
-    vec2 p = (gl_FragCoord.xy - u_capsule.xy) / 46.0;
+    vec2 p = (p_loc - u_capsule.xy) / 46.0;
     vec3 v = voronoi(p);
     float d_edge = v.y;
     float cell_id = v.z;
@@ -275,9 +272,9 @@ void main(void) {
     vec2 facet_tilt = (hash2(vec2(cell_id, cell_id * 1.337)) - 0.5) * 0.38;
 
     // Procedural crystalline frost noise ("шум" как на референсе)
-    vec2 noise_uv = gl_FragCoord.xy / 11.0;
+    vec2 noise_uv = p_loc / 11.0;
     float frost_noise = fbm(noise_uv);
-    float fine_grain = hash12(gl_FragCoord.xy * 0.85);
+    float fine_grain = hash12(p_loc * 0.85);
 
     // Micro-relief bump from frost noise
     vec2 eps_n = vec2(0.85, 0.0);
@@ -358,6 +355,155 @@ void main(void) {
 }
 """
 
+LIQUID_GLASS_MOBILE_FS = """
+#ifdef GL_ES
+precision highp float;
+#endif
+
+varying vec4 frag_color;
+varying vec2 tex_coord0;
+
+uniform vec2 resolution;
+uniform vec4 u_capsule; // local x, y, w, h
+uniform float u_radius;
+uniform float u_style;  // 0: impact, 1: telegram, 2: incy, 3: pinterest
+uniform vec4 u_island1;
+uniform vec4 u_island2;
+uniform vec4 u_island3;
+uniform vec4 u_accent;
+uniform vec4 u_surface_color;
+uniform float u_is_dark;
+
+float roundedBoxSDF(vec2 p, vec2 b, float r) {
+    vec2 q = abs(p) - b + vec2(r);
+    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
+}
+
+float getDist(vec2 coord) {
+    if (u_style > 2.5) {
+        float d1 = roundedBoxSDF(coord - (u_island1.xy + u_island1.zw * 0.5), u_island1.zw * 0.5, u_radius);
+        float d2 = roundedBoxSDF(coord - (u_island2.xy + u_island2.zw * 0.5), u_island2.zw * 0.5, u_radius);
+        float d3 = roundedBoxSDF(coord - (u_island3.xy + u_island3.zw * 0.5), u_island3.zw * 0.5, u_radius);
+        return min(min(d1, d2), d3);
+    } else {
+        return roundedBoxSDF(coord - (u_capsule.xy + u_capsule.zw * 0.5), u_capsule.zw * 0.5, u_radius);
+    }
+}
+
+void main(void) {
+    vec2 p = tex_coord0 * resolution;
+    float dist = getDist(p);
+
+    float alpha = 1.0 - smoothstep(0.0, 1.5, dist);
+    if (alpha <= 0.001) discard;
+
+    float depth = max(-dist, 0.0);
+
+    vec2 eps = vec2(1.0, 0.0);
+    float gx = getDist(p + eps.xy) - getDist(p - eps.xy);
+    float gy = getDist(p + eps.yx) - getDist(p - eps.yx);
+    vec2 edge_grad = normalize(vec2(gx, gy) + vec2(0.00001));
+
+    vec3 base_col = u_surface_color.rgb;
+    vec3 col;
+    float base_alpha;
+    if (u_is_dark > 0.5) {
+        col = mix(base_col, vec3(0.12, 0.16, 0.24), 0.35);
+        base_alpha = 0.88;
+        col *= (1.0 - smoothstep(12.0, 0.0, depth) * 0.12);
+    } else {
+        col = mix(base_col, vec3(0.96, 0.98, 1.0), 0.40);
+        base_alpha = 0.82;
+        col *= (1.0 - smoothstep(12.0, 0.0, depth) * 0.08);
+    }
+
+    // Top edge highlight / glass gleam
+    float top_bevel = smoothstep(2.5, 0.6, depth) * smoothstep(0.0, 0.6, depth) * max(0.0, -edge_grad.y);
+    col += vec3(1.0) * top_bevel * 0.28;
+
+    // Crisp glass rim outline
+    float rim = smoothstep(1.3, 0.0, abs(dist));
+    float rim_direction = 0.4 + 0.6 * max(0.0, -edge_grad.y);
+    col = mix(col, vec3(1.0), rim * 0.35 * rim_direction);
+
+    gl_FragColor = vec4(col, alpha * base_alpha);
+}
+"""
+
+GLASSY_ICE_MOBILE_FS = """
+#ifdef GL_ES
+precision highp float;
+#endif
+
+varying vec4 frag_color;
+varying vec2 tex_coord0;
+
+uniform vec2 resolution;
+uniform vec4 u_capsule; // local x, y, w, h
+uniform float u_radius;
+uniform float u_style;  // 0: impact, 1: telegram, 2: incy, 3: pinterest
+uniform vec4 u_island1;
+uniform vec4 u_island2;
+uniform vec4 u_island3;
+uniform vec4 u_accent;
+uniform vec4 u_surface_color;
+uniform float u_is_dark;
+
+float roundedBoxSDF(vec2 p, vec2 b, float r) {
+    vec2 q = abs(p) - b + vec2(r);
+    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
+}
+
+float getDist(vec2 coord) {
+    if (u_style > 2.5) {
+        float d1 = roundedBoxSDF(coord - (u_island1.xy + u_island1.zw * 0.5), u_island1.zw * 0.5, u_radius);
+        float d2 = roundedBoxSDF(coord - (u_island2.xy + u_island2.zw * 0.5), u_island2.zw * 0.5, u_radius);
+        float d3 = roundedBoxSDF(coord - (u_island3.xy + u_island3.zw * 0.5), u_island3.zw * 0.5, u_radius);
+        return min(min(d1, d2), d3);
+    } else {
+        return roundedBoxSDF(coord - (u_capsule.xy + u_capsule.zw * 0.5), u_capsule.zw * 0.5, u_radius);
+    }
+}
+
+float hash12(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+void main(void) {
+    vec2 p_loc = tex_coord0 * resolution;
+    float dist = getDist(p_loc);
+
+    float alpha = 1.0 - smoothstep(0.0, 1.5, dist);
+    if (alpha <= 0.001) discard;
+
+    float depth = max(-dist, 0.0);
+
+    vec2 grid_pos = (p_loc - u_capsule.xy) / 32.0;
+    vec2 grid_id = floor(grid_pos);
+    float shard = hash12(grid_id * 17.13);
+
+    vec3 ice_tint = (u_is_dark > 0.5)
+        ? vec3(0.10, 0.16, 0.26)
+        : vec3(0.92, 0.96, 1.0);
+
+    vec3 col = mix(u_surface_color.rgb, ice_tint, 0.45);
+    col += (shard - 0.5) * 0.06;
+
+    float grain = hash12(p_loc * 0.7);
+    col += vec3(0.9, 0.96, 1.0) * (grain - 0.5) * 0.05;
+
+    float rim = smoothstep(2.2, 0.4, depth) * smoothstep(0.0, 0.4, depth);
+    float edge_aa = smoothstep(1.3, 0.0, abs(dist));
+    col += vec3(0.85, 0.95, 1.0) * rim * 0.35;
+    col = mix(col, vec3(1.0), edge_aa * 0.25);
+
+    float base_alpha = (u_is_dark > 0.5) ? 0.90 : 0.85;
+    gl_FragColor = vec4(col, alpha * base_alpha);
+}
+"""
+
 
 class DockbarShaderRenderer:
     """Manages GLSL procedural shader rendering with live background refraction for DockBar."""
@@ -374,26 +520,31 @@ class DockbarShaderRenderer:
         self._init_done = False
 
     def init_gl(self):
-        """Initializes RenderContext and background texture lazily when OpenGL context is ready."""
+        """Initializes RenderContext lazily when OpenGL context is ready."""
         if self._init_done:
             return True
 
         try:
-            w = max(1, int(self.dockbar.width or dp(300)))
-            h = max(1, int(self.dockbar.height or dp(78)))
-            self.bg_texture = Texture.create(size=(w, h), colorfmt="rgba")
-
             rc = RenderContext(use_parent_projection=True, use_parent_modelview=True)
             rc.shader.vs = SHADER_VS
-            self.callback = Callback(self._capture_framebuffer)
-            rc.add(self.callback)
-            with rc:
-                self.rect = Rectangle(texture=self.bg_texture, pos=self.dockbar.pos, size=self.dockbar.size)
+
+            if not IS_MOBILE:
+                w = max(1, int(self.dockbar.width or dp(300)))
+                h = max(1, int(self.dockbar.height or dp(78)))
+                self.bg_texture = Texture.create(size=(w, h), colorfmt="rgba")
+                self.callback = Callback(self._capture_framebuffer)
+                rc.add(self.callback)
+                with rc:
+                    self.rect = Rectangle(texture=self.bg_texture, pos=self.dockbar.pos, size=self.dockbar.size)
+            else:
+                with rc:
+                    self.rect = Rectangle(pos=self.dockbar.pos, size=self.dockbar.size)
+
             self.render_context = rc
             # Insert at beginning of canvas.before so it draws behind dock items
             self.dockbar.canvas.before.insert(0, rc)
             self._init_done = True
-            logger.info("DockbarShaderRenderer initialized RenderContext with framebuffer capture successfully")
+            logger.info("DockbarShaderRenderer initialized RenderContext successfully (is_mobile=%s)", IS_MOBILE)
             return True
         except Exception as e:
             logger.warning("DockbarShaderRenderer could not initialize RenderContext: %s", e)
@@ -401,7 +552,7 @@ class DockbarShaderRenderer:
 
     def _capture_framebuffer(self, instr):
         """Copies rendered screen pixels behind the dockbar into bg_texture for refraction."""
-        if not self.bg_texture or self.current_bg_type == "theme":
+        if IS_MOBILE or not self.bg_texture or self.current_bg_type == "theme":
             return
         dockbar = self.dockbar
         try:
@@ -446,21 +597,33 @@ class DockbarShaderRenderer:
         if not self.render_context:
             return
 
-        # Select fragment shader
-        if self.current_bg_type == "liquid_glass":
-            self.render_context.shader.fs = LIQUID_GLASS_FS
-        elif self.current_bg_type == "glassy_ice":
-            self.render_context.shader.fs = GLASSY_ICE_FS
+        if IS_MOBILE:
+            if self.current_bg_type == "liquid_glass":
+                self.render_context.shader.fs = LIQUID_GLASS_MOBILE_FS
+            elif self.current_bg_type == "glassy_ice":
+                self.render_context.shader.fs = GLASSY_ICE_MOBILE_FS
+            else:
+                return
+
+            if self._clock_event:
+                self._clock_event.cancel()
+                self._clock_event = None
         else:
-            return
+            if self.current_bg_type == "liquid_glass":
+                self.render_context.shader.fs = LIQUID_GLASS_FS
+                if self._clock_event:
+                    self._clock_event.cancel()
+                    self._clock_event = None
+            elif self.current_bg_type == "glassy_ice":
+                self.render_context.shader.fs = GLASSY_ICE_FS
+                if self._clock_event is None:
+                    self._clock_event = Clock.schedule_interval(self._on_tick, 1.0 / 20.0)
+            else:
+                return
 
         if not self.render_context.shader.success:
             logger.error("Dockbar shader error: %s", self.render_context.shader.log)
             return
-
-        # Start animation ticker if not already running
-        if self._clock_event is None:
-            self._clock_event = Clock.schedule_interval(self._on_tick, 1.0 / 30.0)
 
         self.update_geometry()
 
@@ -482,48 +645,50 @@ class DockbarShaderRenderer:
         style_map = {"impact": 0, "telegram": 1, "incy": 2, "pinterest": 3}
         u_style = style_map.get(style_str, 0)
 
-        pad_x = dp(16)
-        pad_y = dp(10)
+        pad_x = float(dp(16))
+        pad_y = float(dp(10))
         if u_style == 0:  # impact
-            cap_x = dockbar.x
-            cap_y = dockbar.y
-            cap_w = dockbar.width
-            cap_h = dockbar.height
+            cap_x = 0.0
+            cap_y = 0.0
+            cap_w = float(dockbar.width)
+            cap_h = float(dockbar.height)
             radius = 0.0
         elif u_style == 1:  # telegram
-            cap_x = dockbar.x + pad_x
-            cap_y = dockbar.y + pad_y
-            cap_w = max(1.0, dockbar.width - pad_x * 2)
-            cap_h = max(1.0, dockbar.height - pad_y * 2)
+            cap_x = pad_x
+            cap_y = pad_y
+            cap_w = max(1.0, float(dockbar.width) - pad_x * 2.0)
+            cap_h = max(1.0, float(dockbar.height) - pad_y * 2.0)
             radius = float(cap_h / 2.0)
         elif u_style == 2:  # incy
-            cap_x = dockbar.x + pad_x
-            cap_y = dockbar.y + pad_y
-            cap_w = max(1.0, dockbar.width - pad_x * 2)
-            cap_h = max(1.0, dockbar.height - pad_y * 2)
+            cap_x = pad_x
+            cap_y = pad_y
+            cap_w = max(1.0, float(dockbar.width) - pad_x * 2.0)
+            cap_h = max(1.0, float(dockbar.height) - pad_y * 2.0)
             radius = float(dp(16))
         else:  # pinterest
-            cap_x = dockbar.x
-            cap_y = dockbar.y
-            cap_w = dockbar.width
-            cap_h = dockbar.height
+            cap_x = 0.0
+            cap_y = 0.0
+            cap_w = float(dockbar.width)
+            cap_h = float(dockbar.height)
             sel = getattr(app, "dockbar_selection", "squares")
             radius = float(dp(27) if sel == "circles" else dp(16))
 
         rc = self.render_context
-        rc["u_style"] = int(u_style)
+        rc["u_style"] = float(u_style)
         rc["u_capsule"] = [float(cap_x), float(cap_y), float(cap_w), float(cap_h)]
         rc["u_radius"] = float(radius)
 
         btn_sz = float(dp(54))
+        pad_pinterest = max(float(dp(16)), (float(dockbar.width) - float(dp(190))) / 2.0)
         for i, item_id in enumerate(["item_dialogs", "item_logs", "item_settings"], 1):
             item = dockbar.ids.get(item_id) if hasattr(dockbar, "ids") else None
-            if item:
-                cx, cy = item.center_x, item.center_y
-                rc[f"u_island{i}"] = [float(cx - btn_sz / 2.0), float(cy - btn_sz / 2.0), btn_sz, btn_sz]
+            if item and item.width > dp(10):
+                cx = float(item.center_x - dockbar.x)
+                cy = float(item.center_y - dockbar.y)
             else:
-                offset_x = dockbar.x + (dockbar.width / 4.0) * i
-                rc[f"u_island{i}"] = [float(offset_x - btn_sz / 2.0), float(dockbar.center_y - btn_sz / 2.0), btn_sz, btn_sz]
+                cx = float(pad_pinterest + btn_sz / 2.0 + (i - 1) * (btn_sz + float(dp(14))))
+                cy = float(dockbar.height / 2.0)
+            rc[f"u_island{i}"] = [float(cx - btn_sz / 2.0), float(cy - btn_sz / 2.0), btn_sz, btn_sz]
 
         accent = getattr(app, "accent_color", [0.24, 0.48, 0.95, 1.0])
         rc["u_accent"] = [float(c) for c in accent[:4]]
@@ -537,7 +702,7 @@ class DockbarShaderRenderer:
 
     def _on_tick(self, dt):
         """Animation update tick."""
-        if not self.render_context or self.current_bg_type == "theme":
+        if IS_MOBILE or not self.render_context or self.current_bg_type == "theme":
             return
         elapsed = time.time() - self._start_time
         self.render_context["time"] = float(elapsed)

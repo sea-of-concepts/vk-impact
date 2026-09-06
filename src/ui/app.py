@@ -247,6 +247,9 @@ class VKImpactApp(MDApp):
         logger.info("Logging out. Stopping Long Poll...")
         run_async(self.longpoll_service.stop())
         if self.screen_manager:
+            auth_screen = self.screen_manager.get_screen(ScreenName.AUTH)
+            if hasattr(auth_screen, "set_add_account_mode"):
+                auth_screen.set_add_account_mode(True)
             self.screen_manager.current = ScreenName.AUTH
 
     def on_stop(self):

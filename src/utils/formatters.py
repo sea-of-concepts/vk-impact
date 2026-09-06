@@ -89,24 +89,24 @@ def estimate_message_height(text: str, has_sender_name: bool = False) -> int:
     """
     Accurately calculates message bubble height in dp to eliminate RecycleView layout dancing.
     """
-    base_padding = 40  # Top/bottom padding + timestamp row
+    base_padding = 44  # content_box padding (16) + timestamp row (14) + spacing (6) + outer padding (8)
     if has_sender_name:
-        base_padding += 20  # Sender name header
+        base_padding += 22  # Sender name header (16) + spacing (6)
 
     if not text:
         return base_padding + 22
 
-    # Estimate wrapped lines (average ~26 chars per line in 78% bubble width)
+    # Estimate wrapped lines (conservative ~25 chars per line in 78% bubble width)
     lines = text.split("\n")
     total_lines = 0
     for line in lines:
         line_len = len(line)
-        wrapped_count = max(1, (line_len + 25) // 26)
+        wrapped_count = max(1, (line_len + 24) // 25)
         total_lines += wrapped_count
 
     text_height = total_lines * 22
     total = base_padding + text_height
-    return max(56, total)
+    return max(60, total)
 
 
 def format_unread_count(count: int) -> str:

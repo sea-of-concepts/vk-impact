@@ -9,11 +9,12 @@ from src.utils.async_tools import run_async
 
 
 class MediaCacheManager:
-    """Manages disk and memory caching of remote image assets."""
-
     def __init__(self, cache_dir: Optional[Path] = None):
         self.cache_dir = cache_dir or (config.CACHE_DIR / "images")
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
         self._memory_cache: Dict[str, str] = {}
         self._pending_downloads: Dict[str, list] = {}
 

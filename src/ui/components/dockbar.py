@@ -38,6 +38,11 @@ class DockBar(BoxLayout):
             if hasattr(self, "shader_renderer") and self.shader_renderer:
                 self.shader_renderer.update_shader(getattr(app, "dockbar_bg", "theme"))
 
+    def do_layout(self, *largs):
+        super().do_layout(*largs)
+        if hasattr(self, "shader_renderer") and self.shader_renderer:
+            self.shader_renderer.update_geometry()
+
     def _on_app_bg_change(self, instance, value):
         self.shader_renderer.update_shader(value)
 

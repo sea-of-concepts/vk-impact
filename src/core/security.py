@@ -4,6 +4,7 @@ import os
 import uuid
 import base64
 import platform
+import hashlib
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 from cryptography.fernet import Fernet
@@ -56,15 +57,31 @@ def get_hardware_fingerprint() -> str:
 def derive_hardware_key(fingerprint: Optional[str] = None, salt: bytes = b"VK_IMPACT_HW_SALT_v1") -> bytes:
     """
     Derives a 256-bit Fernet key from the hardware fingerprint using PBKDF2HMAC-SHA256.
+    Uses Python's standard hashlib.pbkdf2_hmac for guaranteed cross-platform
+    compatibility across all cryptography backend versions.
     """
     hw_str = (fingerprint or get_hardware_fingerprint()).encode("utf-8")
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=100_000
-    )
-    return base64.urlsafe_b64encode(kdf.derive(hw_str))
+    try:
+        raw_key = hashlib.pbkdf2_hmac("sha256", hw_str, salt, 100_000, dklen=32)
+    except Exception:
+        try:
+            from cryptography.hazmat.backends import default_backend
+            kdf = PBKDF2HMAC(
+                algorithm=hashes.SHA256(),
+                length=32,
+                salt=salt,
+                iterations=100_000,
+                backend=default_backend()
+            )
+        except TypeError:
+            kdf = PBKDF2HMAC(
+                algorithm=hashes.SHA256(),
+                length=32,
+                salt=salt,
+                iterations=100_000
+            )
+        raw_key = kdf.derive(hw_str)
+    return base64.urlsafe_b64encode(raw_key)
 
 
 class SecurityManager:
@@ -250,6 +267,11 @@ class SecurityManager:
                     self.accounts_file.unlink()
                 except Exception as e:
                     logger.warning("Could not delete accounts file: %s", e)
+            if self.session_file.exists():
+                try:
+                    self.session_file.unlink()
+                except Exception as e:
+                    logger.warning("Could not delete legacy session file: %s", e)
 
         return new_accounts
 
@@ -312,6 +334,11 @@ class SecurityManager:
 
             self.save_accounts([account])
             logger.info("Successfully migrated legacy session for user_id=%s to accounts.enc", user_id)
+            if self.session_file.exists():
+                try:
+                    self.session_file.unlink()
+                except Exception:
+                    pass
             return account
         except Exception as e:
             logger.warning("Could not migrate legacy session: %s", e)
@@ -353,6 +380,11 @@ class SecurityManager:
         acc = self.get_active_account()
         if acc:
             self.remove_account(acc.get("id", 0))
+        if self.session_file.exists():
+            try:
+                self.session_file.unlink()
+            except Exception:
+                pass
         return True
 
 

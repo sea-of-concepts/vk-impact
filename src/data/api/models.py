@@ -2,6 +2,23 @@
 from typing import Optional, List, Dict, Any, Union
 from pydantic import BaseModel, Field
 
+# Pydantic v1 <-> v2 compatibility shim for Android / desktop interoperability
+if not hasattr(BaseModel, "model_validate"):
+    @classmethod
+    def _model_validate(cls, obj, *args, **kwargs):
+        return cls.parse_obj(obj)
+    BaseModel.model_validate = _model_validate
+
+if not hasattr(BaseModel, "model_dump"):
+    def _model_dump(self, *args, **kwargs):
+        return self.dict(*args, **kwargs)
+    BaseModel.model_dump = _model_dump
+
+if not hasattr(BaseModel, "model_dump_json"):
+    def _model_dump_json(self, *args, **kwargs):
+        return self.json(*args, **kwargs)
+    BaseModel.model_dump_json = _model_dump_json
+
 
 class VKUser(BaseModel):
     """VK User profile model."""

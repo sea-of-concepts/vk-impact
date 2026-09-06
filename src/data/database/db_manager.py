@@ -10,9 +10,22 @@ from src.core.logger import logger
 class DatabaseManager:
     """Manages local SQLite cache for dialogs, messages, users and custom folders."""
 
-    def __init__(self, db_path: str = "cache/storage.db"):
-        self.db_path = db_path
-        os.makedirs(os.path.dirname(self.db_path) if os.path.dirname(self.db_path) else ".", exist_ok=True)
+    def __init__(self, db_path: Optional[str] = None):
+        if db_path is None:
+            try:
+                from src.core.config import config
+                self.db_path = str(config.DB_PATH)
+            except Exception:
+                self.db_path = "storage.db"
+        else:
+            self.db_path = db_path
+
+        try:
+            parent = os.path.dirname(self.db_path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+        except Exception as e:
+            logger.warning("Could not pre-create db directory for %s: %s", self.db_path, e)
 
     def set_user(self, user_id: int) -> None:
         """Switches the active database to the account-specific SQLite database."""
@@ -27,7 +40,12 @@ class DatabaseManager:
             except Exception as e:
                 logger.warning("Could not copy legacy database: %s", e)
         self.db_path = target_path
-        os.makedirs(os.path.dirname(self.db_path) if os.path.dirname(self.db_path) else ".", exist_ok=True)
+        try:
+            parent = os.path.dirname(self.db_path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+        except Exception as e:
+            logger.warning("Could not create db directory %s: %s", self.db_path, e)
 
 
     async def init_db(self) -> None:

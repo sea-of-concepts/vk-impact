@@ -23,5 +23,6 @@ ENV/
 build/
 dist/
 *.spec
+!buildozer.spec
 .buildozer/
 bin/

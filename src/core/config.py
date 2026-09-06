@@ -9,6 +9,42 @@ if hasattr(ssl, "_create_unverified_context"):
 
 
 
+def _get_default_base_dir() -> Path:
+    """Returns platform-aware writable base directory."""
+    android_private = os.environ.get("ANDROID_PRIVATE")
+    if android_private:
+        p = Path(android_private) / "vk_impact"
+        try:
+            p.mkdir(parents=True, exist_ok=True)
+            return p
+        except Exception:
+            return Path(android_private)
+
+    try:
+        from kivy.utils import platform
+        if platform == "android":
+            try:
+                from jnius import autoclass
+                PythonActivity = autoclass('org.kivy.android.PythonActivity')
+                activity = PythonActivity.mActivity
+                if activity:
+                    files_dir = activity.getFilesDir().getAbsolutePath()
+                    p = Path(files_dir) / "vk_impact"
+                    p.mkdir(parents=True, exist_ok=True)
+                    return p
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    p = Path(os.path.expanduser("~/.vk_impact"))
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    return p
+
+
 @dataclass
 class AppConfig:
     """Global configuration settings for VK_IMPACT."""
@@ -27,9 +63,6 @@ class AppConfig:
     WEB_USER_AGENT: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
     
     # Standard official client IDs (used for direct auth and message access)
-    # 2685278 - Kate Mobile (supports direct auth, messages, offline, wall, audio)
-    # 2274003 - VK Android
-    # 6121396 - VK Me
     CLIENT_ID_KATE: str = "2685278"
     CLIENT_SECRET_KATE: str = "lxhD8OD7dMsqtXIm5LDK"
     
@@ -46,18 +79,24 @@ class AppConfig:
     DEFAULT_SCOPE: int = 1073741823  # All possible permissions
     
     # App storage directory
-    BASE_DIR: Path = field(default_factory=lambda: Path(os.path.expanduser("~/.vk_impact")))
+    BASE_DIR: Path = field(default_factory=_get_default_base_dir)
     
     @property
     def DATA_DIR(self) -> Path:
         path = self.BASE_DIR / "data"
-        path.mkdir(parents=True, exist_ok=True)
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
         return path
 
     @property
     def CACHE_DIR(self) -> Path:
         path = self.BASE_DIR / "cache"
-        path.mkdir(parents=True, exist_ok=True)
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
         return path
 
     @property

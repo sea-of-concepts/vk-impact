@@ -1,6 +1,7 @@
 """Message bubble component with pre-calculated height for smooth scrolling."""
 from kivy.uix.boxlayout import BoxLayout
 from kivy.properties import StringProperty, BooleanProperty, NumericProperty, ListProperty
+from kivy.metrics import dp
 
 
 class MessageBubble(BoxLayout):
@@ -15,4 +16,4 @@ class MessageBubble(BoxLayout):
     is_read = BooleanProperty(True)
     message_id = NumericProperty(0)
     show_new_divider = BooleanProperty(False)
-    msg_size = ListProperty([None, 64])
+    msg_size = ListProperty([None, dp(64)])

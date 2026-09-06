@@ -4,9 +4,9 @@
 <ProfileAccentSettingRow>:
     orientation: "horizontal"
     size_hint_y: None
-    height: dp(64)
-    padding: [dp(16), dp(12)]
-    spacing: dp(14)
+    height: max(dp(68), accent_text_box.minimum_height + dp(22))
+    padding: [dp(16), dp(10)]
+    spacing: dp(12)
     canvas.before:
         Color:
             rgba: app.card_bg if self.state == "normal" else app.divider_color
@@ -28,8 +28,11 @@
 
     # Setting Title and subtitle
     BoxLayout:
+        id: accent_text_box
         orientation: "vertical"
         spacing: dp(2)
+        size_hint_y: None
+        height: self.minimum_height
         pos_hint: {"center_y": 0.5}
 
         Label:
@@ -39,20 +42,24 @@
             color: app.text_color
             halign: "left"
             valign: "middle"
+            size_hint_y: None
+            height: self.texture_size[1]
             text_size: (self.width, None)
 
         Label:
-            text: "Иконки, ссылки, выделения"
+            text: "Иконки, кнопки, выделение"
             font_size: "12sp"
             color: app.secondary_text_color
             halign: "left"
             valign: "middle"
+            size_hint_y: None
+            height: self.texture_size[1]
             text_size: (self.width, None)
 
     # Circular color preview on the right
     Widget:
         size_hint: (None, None)
-        size: (dp(32), dp(32))
+        size: (dp(30), dp(30))
         pos_hint: {"center_y": 0.5}
         canvas.before:
             Color:
@@ -63,7 +70,7 @@
             Color:
                 rgba: (1, 1, 1, 0.2) if app.theme_mode != "light" else (0, 0, 0, 0.15)
             Line:
-                circle: (self.center_x, self.center_y, dp(16))
+                circle: (self.center_x, self.center_y, dp(15))
                 width: dp(1.5)
 
     # Chevron
@@ -79,9 +86,9 @@
 <ProfileThemeSettingRow>:
     orientation: "horizontal"
     size_hint_y: None
-    height: dp(64)
-    padding: [dp(16), dp(12)]
-    spacing: dp(14)
+    height: max(dp(68), theme_text_box.minimum_height + dp(22))
+    padding: [dp(16), dp(10)]
+    spacing: dp(12)
     canvas.before:
         Color:
             rgba: app.card_bg if self.state == "normal" else app.divider_color
@@ -103,8 +110,11 @@
 
     # Setting Title and subtitle
     BoxLayout:
+        id: theme_text_box
         orientation: "vertical"
         spacing: dp(2)
+        size_hint_y: None
+        height: self.minimum_height
         pos_hint: {"center_y": 0.5}
 
         Label:
@@ -114,6 +124,8 @@
             color: app.text_color
             halign: "left"
             valign: "middle"
+            size_hint_y: None
+            height: self.texture_size[1]
             text_size: (self.width, None)
 
         Label:
@@ -122,6 +134,8 @@
             color: app.secondary_text_color
             halign: "left"
             valign: "middle"
+            size_hint_y: None
+            height: self.texture_size[1]
             text_size: (self.width, None)
 
     # Selected theme label preview
@@ -131,7 +145,11 @@
         bold: True
         color: app.accent_color
         size_hint_x: None
-        width: self.texture_size[0] + dp(8)
+        width: min(dp(110), self.texture_size[0] + dp(8))
+        shorten: True
+        shorten_from: "right"
+        halign: "right"
+        text_size: (self.width, None)
         pos_hint: {"center_y": 0.5}
 
     # Chevron
@@ -147,9 +165,9 @@
 <ProfileDockbarStyleSettingRow>:
     orientation: "horizontal"
     size_hint_y: None
-    height: dp(64)
-    padding: [dp(16), dp(12)]
-    spacing: dp(14)
+    height: max(dp(68), dockstyle_text_box.minimum_height + dp(22))
+    padding: [dp(16), dp(10)]
+    spacing: dp(12)
     canvas.before:
         Color:
             rgba: app.card_bg if self.state == "normal" else app.divider_color
@@ -171,8 +189,11 @@
 
     # Setting Title and subtitle
     BoxLayout:
+        id: dockstyle_text_box
         orientation: "vertical"
         spacing: dp(2)
+        size_hint_y: None
+        height: self.minimum_height
         pos_hint: {"center_y": 0.5}
 
         Label:
@@ -182,6 +203,8 @@
             color: app.text_color
             halign: "left"
             valign: "middle"
+            size_hint_y: None
+            height: self.texture_size[1]
             text_size: (self.width, None)
 
         Label:
@@ -190,6 +213,8 @@
             color: app.secondary_text_color
             halign: "left"
             valign: "middle"
+            size_hint_y: None
+            height: self.texture_size[1]
             text_size: (self.width, None)
 
     # Selected style label preview
@@ -199,7 +224,11 @@
         bold: True
         color: app.accent_color
         size_hint_x: None
-        width: self.texture_size[0] + dp(8)
+        width: min(dp(110), self.texture_size[0] + dp(8))
+        shorten: True
+        shorten_from: "right"
+        halign: "right"
+        text_size: (self.width, None)
         pos_hint: {"center_y": 0.5}
 
     # Chevron
@@ -215,9 +244,9 @@
 <ProfileDockbarSelectionSettingRow>:
     orientation: "horizontal"
     size_hint_y: None
-    height: dp(64)
-    padding: [dp(16), dp(12)]
-    spacing: dp(14)
+    height: max(dp(68), docksel_text_box.minimum_height + dp(22))
+    padding: [dp(16), dp(10)]
+    spacing: dp(12)
     canvas.before:
         Color:
             rgba: app.card_bg if self.state == "normal" else app.divider_color
@@ -239,8 +268,11 @@
 
     # Setting Title and subtitle
     BoxLayout:
+        id: docksel_text_box
         orientation: "vertical"
         spacing: dp(2)
+        size_hint_y: None
+        height: self.minimum_height
         pos_hint: {"center_y": 0.5}
 
         Label:
@@ -250,14 +282,18 @@
             color: app.text_color
             halign: "left"
             valign: "middle"
+            size_hint_y: None
+            height: self.texture_size[1]
             text_size: (self.width, None)
 
         Label:
-            text: "Форма выделения или кнопок"
+            text: "Стиль индикатора"
             font_size: "12sp"
             color: app.secondary_text_color
             halign: "left"
             valign: "middle"
+            size_hint_y: None
+            height: self.texture_size[1]
             text_size: (self.width, None)
 
     # Selected selection label preview
@@ -267,7 +303,11 @@
         bold: True
         color: app.accent_color
         size_hint_x: None
-        width: self.texture_size[0] + dp(8)
+        width: min(dp(110), self.texture_size[0] + dp(8))
+        shorten: True
+        shorten_from: "right"
+        halign: "right"
+        text_size: (self.width, None)
         pos_hint: {"center_y": 0.5}
 
     # Chevron
@@ -283,9 +323,9 @@
 <ProfileDockbarBgSettingRow>:
     orientation: "horizontal"
     size_hint_y: None
-    height: dp(64)
-    padding: [dp(16), dp(12)]
-    spacing: dp(14)
+    height: max(dp(68), dockbg_text_box.minimum_height + dp(22))
+    padding: [dp(16), dp(10)]
+    spacing: dp(12)
     canvas.before:
         Color:
             rgba: app.card_bg if self.state == "normal" else app.divider_color
@@ -307,25 +347,32 @@
 
     # Setting Title and subtitle
     BoxLayout:
+        id: dockbg_text_box
         orientation: "vertical"
         spacing: dp(2)
+        size_hint_y: None
+        height: self.minimum_height
         pos_hint: {"center_y": 0.5}
 
         Label:
-            text: "Докбар: фон"
+            text: "Фон докбара"
             bold: True
             font_size: "15sp"
             color: app.text_color
             halign: "left"
             valign: "middle"
+            size_hint_y: None
+            height: self.texture_size[1]
             text_size: (self.width, None)
 
         Label:
-            text: "Согласно теме, Liquid glass, Glassy ice"
+            text: "Эффект подложки"
             font_size: "12sp"
             color: app.secondary_text_color
             halign: "left"
             valign: "middle"
+            size_hint_y: None
+            height: self.texture_size[1]
             text_size: (self.width, None)
 
     # Selected background label preview
@@ -335,7 +382,11 @@
         bold: True
         color: app.accent_color
         size_hint_x: None
-        width: self.texture_size[0] + dp(8)
+        width: min(dp(110), self.texture_size[0] + dp(8))
+        shorten: True
+        shorten_from: "right"
+        halign: "right"
+        text_size: (self.width, None)
         pos_hint: {"center_y": 0.5}
 
     # Chevron
@@ -351,9 +402,9 @@
 <ProfileDockbarLabelsSettingRow>:
     orientation: "horizontal"
     size_hint_y: None
-    height: dp(64)
-    padding: [dp(16), dp(12)]
-    spacing: dp(14)
+    height: max(dp(68), docklabels_text_box.minimum_height + dp(22))
+    padding: [dp(16), dp(10)]
+    spacing: dp(12)
     disabled: root.is_disabled
     opacity: 0.5 if root.is_disabled else 1.0
     canvas.before:
@@ -377,25 +428,32 @@
 
     # Setting Title and subtitle
     BoxLayout:
+        id: docklabels_text_box
         orientation: "vertical"
         spacing: dp(2)
+        size_hint_y: None
+        height: self.minimum_height
         pos_hint: {"center_y": 0.5}
 
         Label:
-            text: "Докбар: названия разделов"
+            text: "Докбар: подписи"
             bold: True
             font_size: "15sp"
             color: app.text_color
             halign: "left"
             valign: "middle"
+            size_hint_y: None
+            height: self.texture_size[1]
             text_size: (self.width, None)
 
         Label:
-            text: "Недоступно для Pinterest" if root.is_disabled else "Отображать подписи под иконками"
+            text: "Недоступно для Pinterest" if root.is_disabled else "Текст под иконками"
             font_size: "12sp"
             color: app.secondary_text_color
             halign: "left"
             valign: "middle"
+            size_hint_y: None
+            height: self.texture_size[1]
             text_size: (self.width, None)
 
     MDSwitch:
@@ -403,6 +461,7 @@
         active: root.is_active and not root.is_disabled
         pos_hint: {"center_y": 0.5}
         on_active: (root.screen.set_dockbar_labels(self.active) if not root.is_disabled else None) if root.screen else None
+
 
 
 <ProfileEditScreen>:

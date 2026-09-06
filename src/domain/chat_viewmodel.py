@@ -2,6 +2,7 @@
 from typing import List, Dict, Any, Optional
 from kivy.properties import ListProperty, StringProperty, NumericProperty, BooleanProperty
 from kivy.clock import Clock
+from kivy.metrics import dp
 from src.domain.base_viewmodel import BaseViewModel
 from src.data.repositories.messages_repo import messages_repo
 from src.data.repositories.users_repo import users_repo
@@ -388,7 +389,7 @@ class ChatViewModel(BaseViewModel):
                 "is_outgoing": m.is_outgoing,
                 "is_read": not is_unread,
                 "show_new_divider": is_first_unread,
-                "msg_size": [None, total_height]
+                "msg_size": [None, dp(total_height)]
             })
         self.messages = rv_data
 
@@ -415,7 +416,7 @@ class ChatViewModel(BaseViewModel):
             "time_text": format_timestamp(timestamp),
             "is_outgoing": is_out,
             "is_read": is_out,
-            "msg_size": [None, height]
+            "msg_size": [None, dp(height)]
         }
         self.messages = list(self.messages) + [new_item]
         

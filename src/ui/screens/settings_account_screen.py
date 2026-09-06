@@ -71,13 +71,27 @@ class AccountSettingsScreen(MDScreen):
         - 2 accounts -> Automatically switch to the remaining 1 account
         - > 2 accounts -> AccountSelectionScreen
         """
-        if not self.user_id:
+        uid = None
+        if self.user_id:
+            try:
+                uid = int(self.user_id)
+            except ValueError:
+                pass
+        if not uid:
+            active = auth_repo.get_active_account()
+            if active and (active.get("id") or active.get("uid")):
+                uid = int(active.get("id") or active.get("uid"))
+
+        if not uid:
             auth_repo.logout()
             if self.manager:
+                auth_screen = self.manager.get_screen(ScreenName.AUTH)
+                if hasattr(auth_screen, "set_add_account_mode"):
+                    auth_screen.set_add_account_mode(True)
                 self.manager.current = ScreenName.AUTH
             return
 
-        current_uid = int(self.user_id)
+        current_uid = uid
 
         async def _do_delete():
             return await auth_repo.delete_account(current_uid)
@@ -86,6 +100,9 @@ class AccountSettingsScreen(MDScreen):
             action, remaining = result
             if action == "auth":
                 if self.manager:
+                    auth_screen = self.manager.get_screen(ScreenName.AUTH)
+                    if hasattr(auth_screen, "set_add_account_mode"):
+                        auth_screen.set_add_account_mode(True)
                     self.manager.current = ScreenName.AUTH
             elif action == "switched":
                 self.refresh_account_info()
@@ -95,6 +112,12 @@ class AccountSettingsScreen(MDScreen):
 
         def _on_error(exc):
             logger.error("Error logging out/deleting account: %s", exc)
+            auth_repo.logout()
+            if self.manager:
+                auth_screen = self.manager.get_screen(ScreenName.AUTH)
+                if hasattr(auth_screen, "set_add_account_mode"):
+                    auth_screen.set_add_account_mode(True)
+                self.manager.current = ScreenName.AUTH
 
         run_async(_do_delete(), on_success=_on_done, on_error=_on_error)
 

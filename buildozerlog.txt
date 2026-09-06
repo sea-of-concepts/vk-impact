@@ -1,0 +1,296 @@
+sergeyoshi@DESKTOP-91HBK2A:~/VK_IMPACT$ cd .buildozer/android/platform/python-for-android
+sergeyoshi@DESKTOP-91HBK2A:~/VK_IMPACT/.buildozer/android/platform/python-for-android$ sed -i 's/sh>=1.10, <2.0/sh>=2, <3.0/g' setup.py
+sergeyoshi@DESKTOP-91HBK2A:~/VK_IMPACT/.buildozer/android/platform/python-for-android$ /home/sergeyoshi/VK_IMPACT/env/bin/python3 -m pip install --upgrade "sh>=2,<3.0"
+Collecting sh<3.0,>=2
+  Using cached sh-2.4.0-py3-none-any.whl.metadata (3.8 kB)
+Using cached sh-2.4.0-py3-none-any.whl (48 kB)
+Installing collected packages: sh
+  Attempting uninstall: sh
+    Found existing installation: sh 1.14.3
+    Not uninstalling sh at /home/sergeyoshi/.local/lib/python3.13/site-packages, outside environment /home/sergeyoshi/VK_IMPACT/env
+    Can't uninstall 'sh'. No files were found to uninstall.
+Successfully installed sh-2.4.0
+sergeyoshi@DESKTOP-91HBK2A:~/VK_IMPACT/.buildozer/android/platform/python-for-android$ git -c user.name="sea-of-concepts" -c user.email="seaof.concepts.z@gmail.com" commit -am "bump sh to 2.x"
+[detached HEAD ca6fb845] bump sh to 2.x
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+sergeyoshi@DESKTOP-91HBK2A:~/VK_IMPACT/.buildozer/android/platform/python-for-android$ cd ../../../..
+sergeyoshi@DESKTOP-91HBK2A:~/VK_IMPACT$ env/bin/buildozer android debug
+# Ensure build layout
+# Check configuration tokens
+# Preparing build
+# Check requirements for android
+# Search for Git (git)
+#  -> found at /usr/bin/git
+# Search for Cython (cython)
+#  -> found at /home/sergeyoshi/.local/bin/cython
+# Search for Java compiler (javac)
+#  -> found at /usr/bin/javac
+# Search for Java keytool (keytool)
+#  -> found at /usr/bin/keytool
+# Install platform
+# Run '/home/sergeyoshi/VK_IMPACT/env/bin/python3 -m pip install -q --user appdirs colorama>=0.3.3 jinja2 sh>=2, <3.0; sys_platform!="win32" build toml packaging setuptools' ...
+# Cwd None
+# Apache ANT found at /home/sergeyoshi/.buildozer/android/platform/apache-ant-1.9.4
+# Android SDK found at /home/sergeyoshi/.buildozer/android/platform/android-sdk
+# Recommended android's NDK version by p4a is: 25b
+# Android NDK found at /home/sergeyoshi/.buildozer/android/platform/android-ndk-r25b
+# Run '/home/sergeyoshi/VK_IMPACT/env/bin/python3 -m pythonforandroid.toolchain aab -h --color=always --storage-dir=/home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a --ndk-api=24 --ignore-setup-py --debug' ...
+# Cwd ./.buildozer/android/platform/python-for-android
+# Check application requirements
+# Compile platform
+# Run '/home/sergeyoshi/VK_IMPACT/env/bin/python3 -m pythonforandroid.toolchain create --dist_name=vkimpact --bootstrap=sdl2 --requirements=python3,kivy==2.3.0,https://github.com/kivymd/KivyMD/archive/master.zip,materialyoucolor,asynckivy,asyncgui,aiohttp,aiosqlite,httpx,pydantic,cryptography,pillow,plyer,beautifulsoup4,certifi,openssl,sqlite3 --arch=arm64-v8a --arch=armeabi-v7a --copy-libs --color=always --storage-dir=/home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a --ndk-api=24 --ignore-setup-py --debug' ...
+# Cwd ./.buildozer/android/platform/python-for-android
+[WARNING]: prerequisites.py is experimental and does not support all prerequisites yet.
+[WARNING]: Please report any issues to the python-for-android issue tracker.
+[WARNING]: prerequisites.py is experimental and does not support all prerequisites yet.
+[WARNING]: Please report any issues to the python-for-android issue tracker.
+[INFO]:    Recipe kivy: version "2.3.0" requested
+[INFO]:    Will compile for the following archs: arm64-v8a, armeabi-v7a
+[INFO]:    Found Android API target in $ANDROIDAPI: 34
+[INFO]:    Available Android APIs are (33, 34)
+[INFO]:    Requested API target 34 is available, continuing.
+[INFO]:    Found NDK dir in $ANDROIDNDK: /home/sergeyoshi/.buildozer/android/platform/android-ndk-r25b
+[INFO]:    Found NDK version 25b
+[INFO]:    Getting NDK API version (i.e. minimum supported API) from user argument
+[INFO]:    ccache is missing, the build will not be optimized in the future.
+/usr/bin/python3: No module named cython
+[WARNING]: Cython for python3 missing. If you are building for  a python 3 target (which is the default) then THINGS WILL BREAK.
+[DEBUG]:   All possible dists: []
+[DEBUG]:   Dist matching name and arch: []
+[DEBUG]:   Dist matching ndk_api and recipe: []
+[INFO]:    No existing dists meet the given requirements!
+[DEBUG]:   Remove directory and subdirectory /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/dists/vkimpact
+[INFO]:    No dist exists that meets your requirements, so one will be built.
+[INFO]:    Found a single valid recipe set: ['aiosqlite', 'asyncgui', 'asynckivy', 'beautifulsoup4', 'certifi', 'freetype', 'hostpython3', 'https://github.com/kivymd/kivymd/archive/master.zip', 'httpx', 'jpeg', 'libffi', 'materialyoucolor', 'openssl', 'plyer', 'png', 'sdl2_image', 'sdl2_mixer', 'sdl2_ttf', 'sqlite3', 'python3', 'sdl2', 'setuptools', 'aiohttp', 'pillow', 'pycparser', 'pydantic', 'six', 'cffi', 'pyjnius', 'android', 'cryptography', 'kivy']
+[INFO]:    The selected bootstrap is sdl2
+[INFO]:    # Creating dist with sdl2 bootstrap
+[INFO]:    Dist will have name vkimpact and requirements (python3, kivy, https://github.com/kivymd/KivyMD/archive/master.zip, materialyoucolor, asynckivy, asyncgui, aiohttp, aiosqlite, httpx, pydantic, cryptography, pillow, plyer, beautifulsoup4, certifi, openssl, sqlite3)
+[INFO]:    Dist contains the following requirements as recipes: ['freetype', 'hostpython3', 'jpeg', 'libffi', 'openssl', 'png', 'sdl2_image', 'sdl2_mixer', 'sdl2_ttf', 'sqlite3', 'python3', 'sdl2', 'setuptools', 'aiohttp', 'pillow', 'pycparser', 'pydantic', 'six', 'cffi', 'pyjnius', 'android', 'cryptography', 'kivy']
+[INFO]:    Dist will also contain modules (Cython, materialyoucolor, devtools, chardet, python-dotenv, beautifulsoup4, https://github.com/kivymd/kivymd/archive/master.zip, idna, aiosqlite, asyncgui, certifi, httpx, plyer, requests, urllib3, asynckivy, typing-extensions, email-validator) installed from pip
+[INFO]:    Dist will be build in mode debug
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/build/bootstrap_builds/sdl2
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[DEBUG]:   Create directory /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/dists/vkimpact
+[INFO]:    Recipe build order is ['freetype', 'hostpython3', 'jpeg', 'libffi', 'openssl', 'png', 'sdl2_image', 'sdl2_mixer', 'sdl2_ttf', 'sqlite3', 'python3', 'sdl2', 'setuptools', 'aiohttp', 'pillow', 'pycparser', 'pydantic', 'six', 'cffi', 'pyjnius', 'android', 'cryptography', 'kivy']
+[INFO]:    The requirements (Cython, aiosqlite, asyncgui, asynckivy, beautifulsoup4, certifi, chardet, devtools, email-validator, https://github.com/kivymd/kivymd/archive/master.zip, httpx, idna, materialyoucolor, plyer, python-dotenv, requests, typing-extensions, urllib3) were not found as recipes, they will be installed with pip.
+[INFO]:    # Downloading recipes
+[INFO]:    Downloading freetype
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/freetype
+[DEBUG]:   -> running basename https://mirror.csclub.uwaterloo.ca/nongnu/freetype/freetype-2.10.1.tar.gz
+[DEBUG]:        freetype-2.10.1.tar.gz
+[INFO]:    freetype download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading hostpython3
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/hostpython3
+[DEBUG]:   -> running basename https://www.python.org/ftp/python/3.11.5/Python-3.11.5.tgz
+[DEBUG]:        Python-3.11.5.tgz
+[INFO]:    hostpython3 download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading jpeg
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/jpeg
+[DEBUG]:   -> running basename https://github.com/libjpeg-turbo/libjpeg-turbo/archive/2.0.1.tar.gz
+[DEBUG]:        2.0.1.tar.gz
+[INFO]:    jpeg download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading libffi
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/libffi
+[DEBUG]:   -> running basename https://github.com/libffi/libffi/archive/v3.4.2.tar.gz
+[DEBUG]:        v3.4.2.tar.gz
+[INFO]:    libffi download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading openssl
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/openssl
+[DEBUG]:   -> running basename https://www.openssl.org/source/openssl-1.1.1w.tar.gz
+[DEBUG]:        openssl-1.1.1w.tar.gz
+[INFO]:    openssl download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading png
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/png
+[DEBUG]:   -> running basename https://github.com/glennrp/libpng/archive/v1.6.37.zip
+[DEBUG]:        v1.6.37.zip
+[INFO]:    png download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading sdl2_image
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/sdl2_image
+[DEBUG]:   -> running basename https://github.com/libsdl-org/SDL_image/releases/download/release-2.8.0/SDL2_image-2.8.0.tar.gz
+[DEBUG]:        SDL2_image-2.8.0.tar.gz
+[INFO]:    sdl2_image download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading sdl2_mixer
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/sdl2_mixer
+[DEBUG]:   -> running basename https://github.com/libsdl-org/SDL_mixer/releases/download/release-2.6.3/SDL2_mixer-2.6.3.tar.gz
+[DEBUG]:        SDL2_mixer-2.6.3.tar.gz
+[INFO]:    sdl2_mixer download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading sdl2_ttf
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/sdl2_ttf
+[DEBUG]:   -> running basename https://github.com/libsdl-org/SDL_ttf/releases/download/release-2.20.2/SDL2_ttf-2.20.2.tar.gz
+[DEBUG]:        SDL2_ttf-2.20.2.tar.gz
+[INFO]:    sdl2_ttf download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading sqlite3
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/sqlite3
+[DEBUG]:   -> running basename https://www.sqlite.org/2021/sqlite-amalgamation-3350500.zip
+[DEBUG]:        sqlite-amalgamation-3350500.zip
+[INFO]:    sqlite3 download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading python3
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/python3
+[DEBUG]:   -> running basename https://www.python.org/ftp/python/3.11.5/Python-3.11.5.tgz
+[DEBUG]:        Python-3.11.5.tgz
+[INFO]:    python3 download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading sdl2
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/sdl2
+[DEBUG]:   -> running basename https://github.com/libsdl-org/SDL/releases/download/release-2.28.5/SDL2-2.28.5.tar.gz
+[DEBUG]:        SDL2-2.28.5.tar.gz
+[INFO]:    sdl2 download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading setuptools
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/setuptools
+[DEBUG]:   -> running basename https://pypi.python.org/packages/source/s/setuptools/setuptools-51.3.3.tar.gz
+[DEBUG]:        setuptools-51.3.3.tar.gz
+[INFO]:    setuptools download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading aiohttp
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/aiohttp
+[DEBUG]:   -> running basename https://pypi.python.org/packages/source/a/aiohttp/aiohttp-3.8.3.tar.gz
+[DEBUG]:        aiohttp-3.8.3.tar.gz
+[INFO]:    aiohttp download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading Pillow
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/Pillow
+[DEBUG]:   -> running basename https://github.com/python-pillow/Pillow/archive/8.4.0.tar.gz
+[DEBUG]:        8.4.0.tar.gz
+[INFO]:    Pillow download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading pycparser
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/pycparser
+[DEBUG]:   -> running basename https://pypi.python.org/packages/source/p/pycparser/pycparser-2.14.tar.gz
+[DEBUG]:        pycparser-2.14.tar.gz
+[INFO]:    pycparser download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading pydantic
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/pydantic
+[DEBUG]:   -> running basename https://github.com/pydantic/pydantic/archive/refs/tags/v1.10.4.zip
+[DEBUG]:        v1.10.4.zip
+[INFO]:    pydantic download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading six
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/six
+[DEBUG]:   -> running basename https://pypi.python.org/packages/source/s/six/six-1.15.0.tar.gz
+[DEBUG]:        six-1.15.0.tar.gz
+[INFO]:    six download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading cffi
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/cffi
+[DEBUG]:   -> running basename https://pypi.python.org/packages/source/c/cffi/cffi-1.15.1.tar.gz
+[DEBUG]:        cffi-1.15.1.tar.gz
+[INFO]:    cffi download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading pyjnius
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/pyjnius
+[DEBUG]:   -> running basename https://github.com/kivy/pyjnius/archive/1.6.1.zip
+[DEBUG]:        1.6.1.zip
+[INFO]:    pyjnius download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading android
+[INFO]:    Skipping android download as no URL is set
+[INFO]:    Downloading cryptography
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/cryptography
+[DEBUG]:   -> running basename https://github.com/pyca/cryptography/archive/2.8.tar.gz
+[DEBUG]:        2.8.tar.gz
+[INFO]:    cryptography download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    Downloading kivy
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/packages/kivy
+[DEBUG]:   -> running basename https://github.com/kivy/kivy/archive/2.3.0.zip
+[DEBUG]:        2.3.0.zip
+[INFO]:    kivy download already cached, skipping
+[INFO]:    <- directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android
+[INFO]:    # Building all recipes for arch arm64-v8a
+[INFO]:    # Unpacking recipes
+[INFO]:    Unpacking freetype for arm64-v8a
+[DEBUG]:   -> running basename https://mirror.csclub.uwaterloo.ca/nongnu/freetype/freetype-2.10.1.tar.gz
+[DEBUG]:        freetype-2.10.1.tar.gz
+[INFO]:    -> directory context /home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/build/other_builds/freetype/arm64-v8a__ndk_target_24
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android/pythonforandroid/toolchain.py", line 1256, in <module>
+    main()
+    ~~~~^^
+  File "/home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android/pythonforandroid/entrypoints.py", line 18, in main
+    ToolchainCL()
+    ~~~~~~~~~~~^^
+  File "/home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android/pythonforandroid/toolchain.py", line 685, in __init__
+    getattr(self, command)(args)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android/pythonforandroid/toolchain.py", line 104, in wrapper_func
+    build_dist_from_args(ctx, dist, args)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android/pythonforandroid/toolchain.py", line 163, in build_dist_from_args
+    build_recipes(build_order, python_modules, ctx,
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                  getattr(args, "private", None),
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+                  ),
+                  ^^
+                 )
+                 ^
+  File "/home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android/pythonforandroid/build.py", line 490, in build_recipes
+    recipe.prepare_build_dir(arch.arch)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "/home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android/pythonforandroid/recipe.py", line 591, in prepare_build_dir
+    self.unpack(arch)
+    ~~~~~~~~~~~^^^^^^
+  File "/home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android/pythonforandroid/recipe.py", line 469, in unpack
+    root_directory = sh.tar('tf', extraction_filename).stdout.decode(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stdout'
+# Command failed: ('/home/sergeyoshi/VK_IMPACT/env/bin/python3', '-m', 'pythonforandroid.toolchain', 'create', '--dist_name=vkimpact', '--bootstrap=sdl2', '--requirements=python3,kivy==2.3.0,https://github.com/kivymd/KivyMD/archive/master.zip,materialyoucolor,asynckivy,asyncgui,aiohttp,aiosqlite,httpx,pydantic,cryptography,pillow,plyer,beautifulsoup4,certifi,openssl,sqlite3', '--arch=arm64-v8a', '--arch=armeabi-v7a', '--copy-libs', '--color=always', '--storage-dir=/home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a', '--ndk-api=24', '--ignore-setup-py', '--debug')
+# Error code: 1
+# ENVIRONMENT:
+#     SHELL = '/bin/bash'
+#     WSL2_GUI_APPS_ENABLED = '1'
+#     WSL_DISTRO_NAME = 'Debian'
+#     NAME = 'DESKTOP-91HBK2A'
+#     PWD = '/home/sergeyoshi/VK_IMPACT'
+#     LOGNAME = 'sergeyoshi'
+#     HOME = '/home/sergeyoshi'
+#     LANG = 'en_US.UTF-8'
+#     WSL_INTEROP = '/run/WSL/72841_interop'
+#     LS_COLORS = 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.7z=01;31:*.ace=01;31:*.alz=01;31:*.apk=01;31:*.arc=01;31:*.arj=01;31:*.bz=01;31:*.bz2=01;31:*.cab=01;31:*.cpio=01;31:*.crate=01;31:*.deb=01;31:*.drpm=01;31:*.dwm=01;31:*.dz=01;31:*.ear=01;31:*.egg=01;31:*.esd=01;31:*.gz=01;31:*.jar=01;31:*.lha=01;31:*.lrz=01;31:*.lz=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.lzo=01;31:*.pyz=01;31:*.rar=01;31:*.rpm=01;31:*.rz=01;31:*.sar=01;31:*.swm=01;31:*.t7z=01;31:*.tar=01;31:*.taz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tgz=01;31:*.tlz=01;31:*.txz=01;31:*.tz=01;31:*.tzo=01;31:*.tzst=01;31:*.udeb=01;31:*.war=01;31:*.whl=01;31:*.wim=01;31:*.xz=01;31:*.z=01;31:*.zip=01;31:*.zoo=01;31:*.zst=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.jxl=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:'
+#     WAYLAND_DISPLAY = 'wayland-0'
+#     TERM = 'xterm-256color'
+#     USER = 'sergeyoshi'
+#     DISPLAY = ':0'
+#     SHLVL = '1'
+#     XDG_RUNTIME_DIR = '/run/user/1000'
+#     WSLENV = ''
+#     PATH = ('/home/sergeyoshi/.buildozer/android/platform/apache-ant-1.9.4/bin:/home/sergeyoshi/.local/bin:/home/sergeyoshi/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/usr/lib/wsl/lib:/mnt/c/Program '
+ 'Files/WindowsApps/MicrosoftCorporationII.WindowsSubsystemForLinux_2.7.13.0_x64__8wekyb3d8bbwe:/mnt/c/Program '
+ 'Files/Common Files/Oracle/Java/javapath:/mnt/c/Program Files (x86)/Common '
+ 'Files/Oracle/Java/java8path:/mnt/c/Program Files (x86)/Common '
+ 'Files/Oracle/Java/javapath:/mnt/c/WINDOWS/system32:/mnt/c/WINDOWS:/mnt/c/WINDOWS/System32/Wbem:/mnt/c/WINDOWS/System32/WindowsPowerShell/v1.0/:/mnt/c/WINDOWS/System32/OpenSSH/:/mnt/c/Program '
+ 'Files/dotnet/:/mnt/c/Program Files (x86)/Lua/5.1:/mnt/c/Program Files '
+ '(x86)/Lua/5.1/clibs:/mnt/c/Program Files/VSCodium/bin:/mnt/c/Program '
+ 'Files/Git/cmd:/mnt/c/Users/Admin/AppData/Local/Programs/Python/Launcher/:/mnt/c/Users/Admin/AppData/Local/Microsoft/WindowsApps:/mnt/c/Users/Admin/AppData/Local/Programs/VSCodium/bin:/mnt/c/Users/Admin/.dotnet/tools:/mnt/c/Users/Admin/AppData/Local/Python/bin:/mnt/c/Users/Admin/AppData/Local/Programs/DockerDesktop/resources/bin:/mnt/c/Users/Admin/AppData/Local/Microsoft/WinGet/Links')
+#     DBUS_SESSION_BUS_ADDRESS = 'unix:path=/run/user/1000/bus'
+#     HOSTTYPE = 'x86_64'
+#     PULSE_SERVER = 'unix:/mnt/wslg/PulseServer'
+#     OLDPWD = '/home/sergeyoshi/VK_IMPACT/.buildozer/android/platform/python-for-android'
+#     _ = 'env/bin/buildozer'
+#     PACKAGES_PATH = '/home/sergeyoshi/.buildozer/android/packages'
+#     ANDROIDSDK = '/home/sergeyoshi/.buildozer/android/platform/android-sdk'
+#     ANDROIDNDK = '/home/sergeyoshi/.buildozer/android/platform/android-ndk-r25b'
+#     ANDROIDAPI = '34'
+#     ANDROIDMINAPI = '24'
+#
+# Buildozer failed to execute the last command
+# The error might be hidden in the log above this error
+# Please read the full log, and search for it before
+# raising an issue with buildozer itself.
+# In case of a bug report, please add a full log with log_level = 2
+sergeyoshi@DESKTOP-91HBK2A:~/VK_IMPACT$

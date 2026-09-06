@@ -92,7 +92,7 @@
 <MessageBubble>:
     orientation: "vertical"
     size_hint_y: None
-    height: dp(root.msg_size[1]) if root.msg_size else dp(64)
+    height: root.msg_size[1] if root.msg_size else dp(64)
 
     # "Новые сообщения" divider
     BoxLayout:

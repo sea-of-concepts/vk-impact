@@ -179,9 +179,9 @@ class DockbarBgDialog(ModalView):
         container.clear_widgets()
 
         items = [
-            ("theme", "Согласно теме", "Стандартный цвет поверхности из темы", "palette-outline"),
-            ("liquid_glass", "Liquid glass", "Шейдер жидкого стекла с волнами и преломлением", "water-outline"),
-            ("glassy_ice", "Glassy ice", "Шейдер гранёного льда с трещинами и переливами", "snowflake"),
+            ("theme", "Согласно теме", "Стандартная поверхность (макс. быстродействие)", "palette-outline"),
+            ("liquid_glass", "Liquid glass", "Шейдер полупрозрачного жидкого стекла", "water-outline"),
+            ("glassy_ice", "Glassy ice", "Шейдер гранёного морозного льда", "snowflake"),
         ]
 
         for key, title, desc, icon in items:
