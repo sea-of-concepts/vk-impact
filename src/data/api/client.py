@@ -329,16 +329,27 @@ class VKApiClient:
         }
         return await self.request("messages.getHistory", params)
 
-    async def messages_send(self, peer_id: int, message: str, attachment: Optional[str] = None) -> int:
-        """Sends a message to a recipient or conversation."""
+    async def messages_send(
+        self,
+        peer_id: int,
+        message: str,
+        attachment: Optional[str] = None,
+        reply_to: Optional[int] = None,
+        forward_messages: Optional[str] = None
+    ) -> int:
+        """Sends a message to a recipient or conversation with optional reply_to or forwarded messages."""
         random_id = random.randint(1, 2**31 - 1)
-        params = {
+        params: Dict[str, Any] = {
             "peer_id": peer_id,
             "message": message,
             "random_id": random_id
         }
         if attachment:
             params["attachment"] = attachment
+        if reply_to:
+            params["reply_to"] = reply_to
+        if forward_messages:
+            params["forward_messages"] = forward_messages
         return await self.request("messages.send", params)
 
     async def messages_mark_as_read(self, peer_id: int, start_message_id: Optional[int] = None) -> int:

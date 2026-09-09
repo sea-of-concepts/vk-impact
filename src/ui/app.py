@@ -1,13 +1,17 @@
 """Main KivyMD Application class for VK_IMPACT."""
 import os
+import time
+import traceback
 from typing import Optional
 from pathlib import Path
 from kivy.lang import Builder
+from kivy.base import ExceptionHandler, ExceptionManager
 from kivymd.app import MDApp
 from kivymd.uix.screenmanager import MDScreenManager
+from src.utils.android_clipboard import install_clipboard_patches
 
 from kivy.properties import ListProperty, StringProperty, BooleanProperty
-from kivy.utils import get_color_from_hex
+from kivy.utils import get_color_from_hex, platform
 
 from src.core.config import config
 from src.core.logger import logger
@@ -53,6 +57,13 @@ def compute_halftone(color_a: list, color_b: list, weight_b: float = 0.5) -> lis
     return [round(r, 4), round(g, 4), round(b, 4), round(a, 4)]
 
 
+class VKImpactExceptionHandler(ExceptionHandler):
+    """Intercepts unexpected UI exceptions to prevent app crashes."""
+    def handle_exception(self, inst):
+        logger.error("Unhandled UI exception caught by ExceptionManager: %s\n%s", inst, traceback.format_exc())
+        return ExceptionManager.PASS
+
+
 class VKImpactApp(MDApp):
     """Core Application handling UI lifecycle, themes and screen navigation."""
 
@@ -86,6 +97,12 @@ class VKImpactApp(MDApp):
         self.title = config.APP_NAME
         self.longpoll_service = VKLongPollService(api_client)
         self.screen_manager: MDScreenManager = None
+        self._last_back_time = 0.0
+        try:
+            install_clipboard_patches()
+            ExceptionManager.add_handler(VKImpactExceptionHandler())
+        except Exception as e:
+            logger.warning("Could not install clipboard patches/exception handler: %s", e)
 
     def update_dockbar_halftones(self):
         """Recalculates halftone (exact mean) and highlight blend colors between current theme and accent."""
@@ -189,6 +206,15 @@ class VKImpactApp(MDApp):
         # Initialize accent color and theme from active personalization profile
         self.refresh_active_theme()
 
+        # Bind theme primary_color to dynamically update Android selection handles
+        if platform == "android":
+            try:
+                from src.utils.android_clipboard import update_android_selection_colors
+                self.theme_cls.bind(primary_color=lambda inst, col: update_android_selection_colors(col))
+                update_android_selection_colors(self.theme_cls.primary_color)
+            except Exception as e:
+                logger.warning("Failed to bind selection handle color: %s", e)
+
         # Load KV files in dependency order
         kv_dir = Path(__file__).parent / "kv"
         Builder.load_file(str(kv_dir / "components.kv"))
@@ -230,12 +256,133 @@ class VKImpactApp(MDApp):
 
     def on_start(self):
         """Called when Kivy event loop is ready."""
+        # Configure mobile soft keyboard
+        try:
+            from kivy.core.window import Window
+            Window.softinput_mode = "below_target"
+            Window.keyboard_anim_args = {"t": "in_out_quart", "d": 0.25}
+        except Exception:
+            pass
+
+        # Fix Android keyboard menu (enable suggestions and actions toolbar instead of password mode)
+        try:
+            from kivy.utils import platform
+            if platform == "android":
+                from jnius import autoclass
+                SDLActivity = autoclass("org.libsdl.app.SDLActivity")
+                InputType = autoclass("android.text.InputType")
+                SDLActivity.keyboardInputType = (
+                    InputType.TYPE_CLASS_TEXT
+                    | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                    | InputType.TYPE_TEXT_FLAG_AUTO_CORRECT
+                )
+                logger.info("Configured SDLActivity.keyboardInputType for full keyboard menu and suggestions")
+        except Exception as e:
+            logger.warning("Could not set SDLActivity.keyboardInputType: %s", e)
+
+        # Bind hardware / system back key (Android back gesture & keycode 27)
+        try:
+            from kivy.core.window import Window
+            Window.bind(on_keyboard=self._on_keyboard)
+        except Exception as e:
+            logger.warning("Could not bind on_keyboard: %s", e)
+
         # Subscribe to global events
         event_bus.subscribe(EventType.AUTH_SUCCESS, self._on_auth_success)
         event_bus.subscribe(EventType.AUTH_LOGOUT, self._on_auth_logout)
 
         # Initialize local database
         run_async(db_manager.init_db())
+
+    def _on_keyboard(self, window, key, scancode, codepoint, modifier):
+        """Handles Android Back gesture / key (keycode 27) and desktop Escape."""
+        if key == 27:
+            return self._handle_back_press()
+        return False
+
+    def _show_exit_toast(self):
+        """Displays native Android toast on back press at root screen."""
+        try:
+            from kivy.utils import platform
+            if platform == "android":
+                from jnius import autoclass
+                PythonActivity = autoclass("org.kivy.android.PythonActivity")
+                Toast = autoclass("android.widget.Toast")
+                String = autoclass("java.lang.String")
+                context = PythonActivity.mActivity.getApplicationContext()
+                Toast.makeText(context, String("Нажмите «Назад» еще раз для выхода"), Toast.LENGTH_SHORT).show()
+        except Exception:
+            pass
+
+    def _handle_back_press(self) -> bool:
+        """Processes back navigation through dialogs, sub-screens, and root exit."""
+        try:
+            from kivy.core.window import Window
+            from kivy.uix.modalview import ModalView
+            from kivy.uix.bubble import Bubble
+
+            # 1. Close any open ModalView (dialogs, popups) or Bubble in Window
+            for child in list(Window.children):
+                if isinstance(child, (ModalView, Bubble)):
+                    child.dismiss()
+                    return True
+
+            if not self.screen_manager:
+                return False
+
+            current = self.screen_manager.current
+
+            # 2. Chat screen -> return to Dialogs list
+            if current == ScreenName.CHAT:
+                chat_screen = self.screen_manager.get_screen(ScreenName.CHAT)
+                if hasattr(chat_screen, "on_back_pressed"):
+                    chat_screen.on_back_pressed()
+                else:
+                    self.screen_manager.current = ScreenName.DIALOGS
+                return True
+
+            # 3. Profile edit screen -> return to Personalization Settings
+            if current == ScreenName.PROFILE_EDIT:
+                self.screen_manager.current = ScreenName.SETTINGS_PERSONALIZATION
+                return True
+
+            # 4. Settings sub-screens -> return to Settings main hub
+            if current in (
+                ScreenName.SETTINGS_ACCOUNT,
+                ScreenName.SETTINGS_PERSONALIZATION,
+                ScreenName.SETTINGS_ABOUT,
+                ScreenName.ACCOUNT_SELECTION,
+            ):
+                self.screen_manager.current = ScreenName.SETTINGS
+                return True
+
+            # 5. Settings main hub or Logs screen -> return to Dialogs list
+            if current in (ScreenName.SETTINGS, ScreenName.LOGS):
+                self.screen_manager.current = ScreenName.DIALOGS
+                return True
+
+            # 6. Auth screen: if adding an account, cancel and return to Settings
+            if current == ScreenName.AUTH:
+                auth_screen = self.screen_manager.get_screen(ScreenName.AUTH)
+                if getattr(auth_screen, "is_add_account_mode", False):
+                    auth_screen.on_back_pressed()
+                    return True
+                # Initial auth screen: allow Android to exit / minimize
+                return False
+
+            # 7. Dialogs screen (Root screen): double back within 2s to exit
+            if current == ScreenName.DIALOGS:
+                now = time.time()
+                if now - self._last_back_time < 2.0:
+                    return False
+                self._last_back_time = now
+                self._show_exit_toast()
+                return True
+
+        except Exception as e:
+            logger.error("Error in _handle_back_press: %s\n%s", e, traceback.format_exc())
+
+        return False
 
     def _on_auth_success(self, user_id: int = 0, **kwargs):
         """Starts Long Poll service on authentication."""

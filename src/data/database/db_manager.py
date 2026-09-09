@@ -89,7 +89,8 @@ class DatabaseManager:
                     out INTEGER,
                     is_read INTEGER,
                     attachments_json TEXT,
-                    fwd_json TEXT
+                    fwd_json TEXT,
+                    reply_json TEXT
                 )
             """)
             await db.execute("CREATE INDEX IF NOT EXISTS idx_messages_peer_date ON messages(peer_id, date DESC)")
@@ -147,6 +148,10 @@ class DatabaseManager:
                 pass
             try:
                 await db.execute("ALTER TABLE messages ADD COLUMN sender_avatar TEXT")
+            except Exception:
+                pass
+            try:
+                await db.execute("ALTER TABLE messages ADD COLUMN reply_json TEXT")
             except Exception:
                 pass
             await db.commit()
@@ -286,15 +291,16 @@ class DatabaseManager:
                 m.get("out", 0),
                 int(m.get("is_read", True)),
                 json.dumps(m.get("attachments", [])),
-                json.dumps(m.get("fwd_messages", []))
+                json.dumps(m.get("fwd_messages", [])),
+                json.dumps(m.get("reply_message")) if m.get("reply_message") else None
             )
             for m in messages
         ]
         async with aiosqlite.connect(self.db_path) as db:
             await db.executemany("""
                 INSERT OR REPLACE INTO messages
-                (id, peer_id, from_id, sender_name, sender_avatar, date, text, out, is_read, attachments_json, fwd_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (id, peer_id, from_id, sender_name, sender_avatar, date, text, out, is_read, attachments_json, fwd_json, reply_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, params)
             await db.commit()
 
@@ -313,6 +319,7 @@ class DatabaseManager:
                 item = dict(row)
                 item["attachments"] = json.loads(item.get("attachments_json") or "[]")
                 item["fwd_messages"] = json.loads(item.get("fwd_json") or "[]")
+                item["reply_message"] = json.loads(item.get("reply_json")) if item.get("reply_json") else None
                 messages.append(item)
             return messages
 

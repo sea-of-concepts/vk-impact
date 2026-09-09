@@ -25,15 +25,15 @@ if not _DEFAULT_OREOL:
 class CircularAvatar(RelativeLayout):
     """Circular avatar with instant initials rendering, oreol support, and non-blocking image loading."""
     
-    source = StringProperty("")
-    local_source = StringProperty("")
-    initials = StringProperty("")
+    source = StringProperty("", allownone=True)
+    local_source = StringProperty("", allownone=True)
+    initials = StringProperty("", allownone=True)
     bg_color = ListProperty([0.24, 0.48, 0.95, 1])
     size_dp = NumericProperty(48)
     is_online = BooleanProperty(False)
     peer_id = NumericProperty(0)
-    impact_style = StringProperty("")
-    oreol_source = StringProperty(_DEFAULT_OREOL)
+    impact_style = StringProperty("", allownone=True)
+    oreol_source = StringProperty(_DEFAULT_OREOL, allownone=True)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -44,7 +44,11 @@ class CircularAvatar(RelativeLayout):
             self._load_avatar(self.source)
 
     def _update_size(self, *args):
-        self.size = (self.size_dp, self.size_dp)
+        from kivy.metrics import dp
+        if self.size_dp > 0:
+            self.size = (dp(self.size_dp), dp(self.size_dp))
+        else:
+            self.size = (0, 0)
 
     def _on_peer_change(self, instance, value):
         if value:

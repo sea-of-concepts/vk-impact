@@ -28,13 +28,13 @@ source.exclude_dirs = tests,bin,.pytest_cache,__pycache__,.git,.github,.venv,env
 # source.exclude_patterns = 
 
 # (str) Application versioning (method 1)
-version = 0.1.0
+version = 1.1
 
 # (str) Application versioning (method 2)
 # version.regex = __version__ = ['"](.*)['"]
 # version.filename = %(source.dir)s/src/core/config.py
 
-requirements = python3,kivy==2.3.0,https://github.com/kivymd/KivyMD/archive/master.zip,materialyoucolor,materialshapes,asynckivy,asyncgui,aiohttp,multidict,yarl,frozenlist,aiosignal,attrs,async-timeout,charset-normalizer,propcache,aiosqlite,httpx,httpcore,anyio,h11,sniffio,beautifulsoup4,soupsieve,pydantic,cryptography,pillow,plyer,certifi,openssl,sqlite3
+requirements = python3,kivy==2.3.0,https://github.com/kivymd/kivymd/archive/master.zip,materialyoucolor,materialshapes,asynckivy,asyncgui,aiohttp,multidict,yarl,frozenlist,aiosignal,attrs,async-timeout,charset-normalizer,propcache,aiosqlite,httpx,httpcore,anyio,h11,sniffio,beautifulsoup4,soupsieve,pydantic,cryptography,pillow,plyer,certifi,openssl,sqlite3
 
 # (str) Custom source folders for requirements
 # Sets custom source for any requirements with recipes

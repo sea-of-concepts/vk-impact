@@ -3,18 +3,18 @@
 
 <CircularAvatar>:
     size_hint: None, None
-    size: dp(root.size_dp), dp(root.size_dp)
+    size: (dp(root.size_dp), dp(root.size_dp)) if root.size_dp > 0 else (0, 0)
     # White spacing disk behind avatar (visible only for zephyr oreol)
     canvas.before:
         Color:
-            rgba: (1, 1, 1, 1) if root.impact_style == "zephyr" else (0, 0, 0, 0)
+            rgba: (1, 1, 1, root.opacity) if (root.impact_style == "zephyr" and root.opacity > 0 and root.size_dp > 0) else (0, 0, 0, 0)
         Ellipse:
             pos: (self.width * 0.07, self.height * 0.07)
             size: (self.width * 0.86, self.height * 0.86)
 
         # Background circle with deterministic user color (only when no image)
         Color:
-            rgba: root.bg_color if not root.local_source else (0, 0, 0, 0)
+            rgba: (root.bg_color[0], root.bg_color[1], root.bg_color[2], root.bg_color[3] * root.opacity) if (not root.local_source and root.opacity > 0 and root.size_dp > 0) else (0, 0, 0, 0)
         Ellipse:
             pos: (self.width * 0.11, self.height * 0.11) if root.impact_style == "zephyr" else (0, 0)
             size: (self.width * 0.9, self.height * 0.9) if root.impact_style == "zephyr" else self.size
@@ -89,10 +89,82 @@
         valign: "middle"
 
 
+<ForwardedMessageItem>:
+    orientation: "vertical"
+    size_hint_y: None
+    height: self.minimum_height
+    padding: [root.indent_dp + dp(10), dp(2), 0, dp(2)]
+    spacing: dp(4)
+
+    canvas.before:
+        Color:
+            rgba: root.stripe_color
+        RoundedRectangle:
+            pos: (self.x + root.indent_dp, self.y + dp(2))
+            size: (dp(2.5), max(dp(8), self.height - dp(4)))
+            radius: [dp(1.25)]
+
+    # Header: circular avatar + author name + timestamp
+    BoxLayout:
+        orientation: "horizontal"
+        size_hint_y: None
+        height: dp(26)
+        spacing: dp(6)
+
+        CircularAvatar:
+            source: root.sender_avatar
+            size_dp: 24 if root.sender_avatar else 0
+            size_hint: None, None
+            size: (dp(24), dp(24)) if root.sender_avatar else (0, 0)
+            opacity: 1 if root.sender_avatar else 0
+            disabled: not root.sender_avatar
+            pos_hint: {"center_y": 0.5}
+
+        BoxLayout:
+            orientation: "vertical"
+            size_hint_x: 1
+            spacing: dp(1)
+
+            Label:
+                text: root.sender_name
+                bold: True
+                font_size: "12sp"
+                color: root.nickname_color
+                halign: "left"
+                valign: "middle"
+                text_size: (self.width, None)
+                size_hint_y: None
+                height: dp(14)
+                shorten: True
+                shorten_from: "right"
+
+            Label:
+                text: root.time_text
+                font_size: "10sp"
+                color: (0.85, 0.9, 0.95, 0.7) if root.is_outgoing else (0.6, 0.65, 0.7, 1)
+                halign: "left"
+                valign: "middle"
+                text_size: (self.width, None)
+                size_hint_y: None
+                height: dp(12)
+
+    # Forwarded text
+    Label:
+        text: root.text
+        font_size: "14sp"
+        color: (1, 1, 1, 1) if root.is_outgoing else (0.95, 0.95, 0.95, 1)
+        halign: "left"
+        valign: "top"
+        text_size: (self.width, None)
+        size_hint_y: None
+        height: self.texture_size[1] if self.text else 0
+        opacity: 1 if self.text else 0
+
+
 <MessageBubble>:
     orientation: "vertical"
     size_hint_y: None
-    height: root.msg_size[1] if root.msg_size else dp(64)
+    height: root.msg_size[1] if (root.msg_size and root.msg_size[1] > 0) else dp(64)
 
     # "Новые сообщения" divider
     BoxLayout:
@@ -137,23 +209,27 @@
 
     # Main Bubble Row
     BoxLayout:
+        id: bubble_row
         orientation: "horizontal"
         size_hint_y: 1
+        x: root.x + root.swipe_x
         padding: [dp(8), dp(2)]
-        spacing: dp(8)
+        spacing: 0
 
         # Left spacer for outgoing messages
         Widget:
-            size_hint_x: 0.22 if root.is_outgoing else 0.001
+            size_hint_x: 0.22 if root.is_outgoing else None
+            width: 0 if root.is_outgoing else 0
             opacity: 0
 
-        # Small sender avatar for incoming messages
+        # Small sender avatar for incoming messages in group chats
         CircularAvatar:
             source: root.sender_avatar
-            size_dp: 32
-            size_hint_x: None
-            width: dp(32) if (not root.is_outgoing and root.sender_avatar) else 0
+            size_dp: 32 if (not root.is_outgoing and root.sender_avatar) else 0
+            size_hint: None, None
+            size: (dp(36), dp(32)) if (not root.is_outgoing and root.sender_avatar) else (0, 0)
             opacity: 1 if (not root.is_outgoing and root.sender_avatar) else 0
+            disabled: not (not root.is_outgoing and root.sender_avatar)
             pos_hint: {"bottom": 1}
             impact_style: root.sender_impact_style
 
@@ -162,8 +238,11 @@
             id: content_box
             orientation: "vertical"
             size_hint_x: 0.78
+            size_hint_y: None
+            height: self.minimum_height
             padding: [dp(16), dp(8)]
-            spacing: dp(3)
+            spacing: dp(4)
+            pos_hint: {"top": 1}
             canvas.before:
                 Color:
                     rgba: app.accent_color if root.is_outgoing else app.bubble_incoming_bg
@@ -172,7 +251,7 @@
                     size: self.size
                     radius: [dp(20), dp(20), dp(4) if root.is_outgoing else dp(20), dp(20) if root.is_outgoing else dp(4)]
 
-            # Sender Name (for incoming messages)
+            # Sender Name (for incoming messages in group chats)
             Label:
                 text: root.sender_name
                 color: app.text_color if (abs(app.accent_color[0] - app.bubble_incoming_bg[0]) < 0.1 and abs(app.accent_color[1] - app.bubble_incoming_bg[1]) < 0.1 and abs(app.accent_color[2] - app.bubble_incoming_bg[2]) < 0.1) else app.accent_color
@@ -185,15 +264,77 @@
                 halign: "left"
                 valign: "middle"
 
+            # Reply Preview Box (image 2)
+            BoxLayout:
+                id: reply_preview_box
+                orientation: "horizontal"
+                size_hint_y: None
+                height: dp(36) if root.reply_message else 0
+                opacity: 1 if root.reply_message else 0
+                disabled: not root.reply_message
+                spacing: dp(8)
+                padding: [0, dp(2)]
+
+                Widget:
+                    size_hint: None, 1
+                    width: dp(3)
+                    canvas:
+                        Color:
+                            rgba: root.stripe_color
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [dp(1.5)]
+
+                BoxLayout:
+                    orientation: "vertical"
+                    size_hint_x: 1
+                    spacing: dp(1)
+
+                    Label:
+                        text: root.reply_message.get("sender_name", "") if root.reply_message else ""
+                        bold: True
+                        font_size: "12sp"
+                        color: root.nickname_color
+                        halign: "left"
+                        valign: "middle"
+                        text_size: (self.width, None)
+                        size_hint_y: None
+                        height: dp(15)
+                        shorten: True
+                        shorten_from: "right"
+
+                    Label:
+                        text: root.reply_message.get("text", "") if root.reply_message else ""
+                        font_size: "13sp"
+                        color: (0.9, 0.95, 1, 0.9) if root.is_outgoing else app.secondary_text_color
+                        halign: "left"
+                        valign: "middle"
+                        text_size: (self.width, None)
+                        size_hint_y: None
+                        height: dp(16)
+                        shorten: True
+                        shorten_from: "right"
+
+            # Forwarded Messages Container (image 3)
+            BoxLayout:
+                id: fwd_container
+                orientation: "vertical"
+                size_hint_y: None
+                height: self.minimum_height
+                spacing: dp(6)
+
             # Message Text
             Label:
                 id: msg_label
                 text: root.text
                 color: (1, 1, 1, 1) if root.is_outgoing else app.bubble_incoming_text
                 text_size: (self.width, None)
-                size_hint_y: 1
+                size_hint_y: None
+                height: self.texture_size[1] if self.text else 0
+                opacity: 1 if self.text else 0
                 halign: "left"
-                valign: "middle"
+                valign: "top"
                 font_size: "15sp"
 
             # Timestamp and Read Status
@@ -224,7 +365,8 @@
 
         # Right spacer for incoming messages
         Widget:
-            size_hint_x: 0.001 if root.is_outgoing else 0.22
+            size_hint_x: None if root.is_outgoing else 0.22
+            width: 0 if not root.is_outgoing else 0
             opacity: 0
 
 
@@ -277,3 +419,36 @@
                 pos: self.pos
                 size: (self.width, self.height) if root.unread_count > 0 else (0, 0)
                 radius: [dp(9)]
+
+<BubbleContent>:
+    padding: [dp(6), dp(4)]
+    spacing: dp(2)
+    background_image: ""
+    background_color: (0, 0, 0, 0)
+    canvas.before:
+        Color:
+            rgba: (0, 0, 0, 0.35)
+        RoundedRectangle:
+            pos: (self.x, self.y - dp(2))
+            size: (self.width, self.height + dp(2))
+            radius: [dp(14)]
+        Color:
+            rgba: (0.16, 0.18, 0.24, 0.96)
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(14)]
+        Color:
+            rgba: (0.35, 0.38, 0.48, 0.4)
+        Line:
+            rounded_rectangle: [self.x, self.y, self.width, self.height, dp(14)]
+            width: 1
+
+<BubbleButton>:
+    font_size: "12sp"
+    bold: True
+    color: (0.92, 0.94, 0.98, 1)
+    background_normal: ""
+    background_down: ""
+    background_color: (0, 0, 0, 0)
+

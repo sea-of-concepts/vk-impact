@@ -34,6 +34,7 @@ class DialogsScreen(MDScreen):
         if not self.vm._all_dialogs:
             self.vm.load_dialogs()
         else:
+            self.vm.sync_from_cache()
             self.vm._apply_folder_filter()
 
     def open_chat(self, peer_id: int, title: str, avatar_url: str = "", is_channel: bool = False, is_muted: bool = False, unread_count: int = 0):

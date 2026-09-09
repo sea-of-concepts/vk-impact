@@ -17,39 +17,65 @@ from src.core.logger import logger
 def get_hardware_fingerprint() -> str:
     """
     Extracts deterministic hardware identifiers for key derivation.
-    On Windows: MachineGuid + PROCESSOR_IDENTIFIER + MAC node.
-    On Linux/others: /etc/machine-id + Processor + MAC node.
+    On Android: Settings.Secure.ANDROID_ID + persistent .install_seed.
+    On Windows: MachineGuid + persistent .install_seed.
+    On Linux/others: /etc/machine-id + persistent .install_seed.
+    Does NOT use uuid.getnode() because on Android it generates random numbers per run.
     """
     parts: List[str] = []
 
-    # 1. Windows MachineGuid from registry
+    # 1. Android Settings.Secure.ANDROID_ID via PyJnius
+    try:
+        from jnius import autoclass
+        PythonActivity = autoclass("org.kivy.android.PythonActivity")
+        SettingsSecure = autoclass("android.provider.Settings$Secure")
+        context = PythonActivity.mActivity.getApplicationContext()
+        android_id = SettingsSecure.getString(context.getContentResolver(), SettingsSecure.ANDROID_ID)
+        if android_id:
+            parts.append(f"android_id:{str(android_id).strip()}")
+    except Exception:
+        pass
+
+    # 2. Windows MachineGuid from registry
     try:
         import winreg
         with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Cryptography") as k:
             guid, _ = winreg.QueryValueEx(k, "MachineGuid")
             if guid:
-                parts.append(str(guid).strip())
+                parts.append(f"win_guid:{str(guid).strip()}")
     except Exception:
         pass
 
-    # 2. Linux / macOS machine-id fallback
+    # 3. Linux / macOS machine-id fallback
     try:
         mid_path = Path("/etc/machine-id")
         if mid_path.exists():
-            parts.append(mid_path.read_text().strip())
+            parts.append(f"mid:{mid_path.read_text(encoding='utf-8').strip()}")
     except Exception:
         pass
 
-    # 3. Processor Identifier / Architecture
-    proc_id = os.environ.get("PROCESSOR_IDENTIFIER") or platform.processor() or platform.machine()
-    parts.append(str(proc_id).strip())
+    # 4. Persistent local install seed (stored in private app data dir)
+    try:
+        seed_file = config.DATA_DIR / ".install_seed"
+        if seed_file.exists():
+            seed = seed_file.read_text(encoding="utf-8").strip()
+        else:
+            seed = uuid.uuid4().hex
+            seed_file.parent.mkdir(parents=True, exist_ok=True)
+            seed_file.write_text(seed, encoding="utf-8")
+        if seed:
+            parts.append(f"seed:{seed}")
+    except Exception:
+        pass
 
-    # 4. Hardware MAC address node
-    parts.append(str(uuid.getnode()))
+    # 5. Processor Identifier / Architecture
+    proc_id = os.environ.get("PROCESSOR_IDENTIFIER") or platform.processor() or platform.machine()
+    if proc_id:
+        parts.append(f"proc:{str(proc_id).strip()}")
 
     # Fallback if somehow empty
     if not parts:
-        parts.append(platform.node())
+        parts.append(platform.node() or "vk_impact_static_node")
 
     return ":".join(parts)
 
@@ -274,6 +300,19 @@ class SecurityManager:
                     logger.warning("Could not delete legacy session file: %s", e)
 
         return new_accounts
+
+    def clear_session(self) -> None:
+        """Deactivates active account without deleting account records."""
+        accounts = self.load_accounts()
+        for acc in accounts:
+            acc["is_active"] = False
+        if accounts:
+            self.save_accounts(accounts)
+        if self.session_file.exists():
+            try:
+                self.session_file.unlink()
+            except Exception as e:
+                logger.warning("Could not delete session file: %s", e)
 
     def clear_all_accounts(self) -> bool:
         """Clears all stored accounts and sessions."""

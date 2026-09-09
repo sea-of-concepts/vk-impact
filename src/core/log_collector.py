@@ -4,6 +4,7 @@ import json
 from collections import deque
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
+from kivy.metrics import dp
 from src.core.events import event_bus
 from src.core.constants import EventType
 
@@ -156,7 +157,7 @@ class LogCollector:
                 "preview_text": e.preview_text,
                 "raw_payload": "",
                 "is_expanded": False,
-                "row_size": [None, 68]
+                "row_size": [None, dp(76)]
             })
         return res
 

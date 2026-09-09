@@ -82,9 +82,9 @@ class LogsScreen(MDScreen):
                 log_id = item.get("log_id", 0)
                 payload = log_collector.get_entry_payload_by_id(log_id)
                 item["raw_payload"] = payload or item.get("preview_text", "")
-                item["row_size"] = [None, dp(270)]
+                item["row_size"] = [None, dp(276)]
             else:
-                item["row_size"] = [None, dp(68)]
+                item["row_size"] = [None, dp(76)]
                 
             self.logs = logs_copy
 
@@ -123,6 +123,6 @@ class LogsScreen(MDScreen):
                 "preview_text": preview_text,
                 "raw_payload": "",
                 "is_expanded": False,
-                "row_size": [None, dp(68)]
+                "row_size": [None, dp(76)]
             }
             self.logs = list(self.logs) + [new_item]

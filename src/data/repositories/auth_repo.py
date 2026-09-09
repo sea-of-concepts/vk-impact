@@ -5,7 +5,7 @@ from src.core.logger import logger
 from src.core.events import event_bus
 from src.core.constants import EventType
 from src.data.api.auth_web import VKWebAuthEngine
-from src.data.api.client import api_client
+from src.data.api.client import api_client, VKApiError
 from src.data.database.db_manager import db_manager
 from src.data.repositories.users_repo import users_repo
 
@@ -67,6 +67,14 @@ class AuthRepository:
                 return True
         except Exception as e:
             logger.warning("Saved token validation failed: %s", e)
+            is_auth_error = isinstance(e, VKApiError) and getattr(e, "code", 0) in (4, 5)
+            if not is_auth_error and not isinstance(e, VKApiError):
+                # Temporary network / connectivity issue: keep session alive offline!
+                logger.info("Preserving active session offline due to network error: %s", e)
+                db_manager.set_user(self._current_user_id)
+                await db_manager.init_db()
+                return True
+
             # If cookie authentication was used, attempt automatic token refresh
             if account.get("oauths_metod") == "cookie" and account.get("remixsid"):
                 try:

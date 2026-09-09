@@ -33,15 +33,27 @@
         size_hint_y: None
         height: dp(36)
 
-    MDTextField:
-        mode: "outlined"
-        size_hint_x: 1
-        text: root.auth_screen.vm.browser_input if root.auth_screen else ""
-        on_text: root.auth_screen.vm.browser_input = self.text if root.auth_screen else ""
-        MDTextFieldLeadingIcon:
-            icon: "link-variant"
-        MDTextFieldHintText:
-            text: "https://oauth...#access_token=vk1.a..."
+    BoxLayout:
+        orientation: "horizontal"
+        spacing: dp(8)
+        size_hint_y: None
+        height: dp(56)
+
+        MDTextField:
+            mode: "outlined"
+            size_hint_x: 1
+            text: root.auth_screen.vm.browser_input if root.auth_screen else ""
+            on_text: root.auth_screen.vm.browser_input = self.text if root.auth_screen else ""
+            MDTextFieldLeadingIcon:
+                icon: "link-variant"
+            MDTextFieldHintText:
+                text: "https://oauth...#access_token=vk1.a..."
+
+        MDIconButton:
+            icon: "content-paste"
+            style: "tonal"
+            pos_hint: {"center_y": 0.5}
+            on_release: root.auth_screen.paste_browser_input() if root.auth_screen else None
 
 
 <CookiesModeContent>:
@@ -58,25 +70,49 @@
         size_hint_y: None
         height: dp(40)
 
-    MDTextField:
-        mode: "outlined"
-        size_hint_x: 1
-        text: root.auth_screen.vm.remixsid_input if root.auth_screen else ""
-        on_text: root.auth_screen.vm.remixsid_input = self.text if root.auth_screen else ""
-        MDTextFieldLeadingIcon:
-            icon: "cookie"
-        MDTextFieldHintText:
-            text: "remixsid"
+    BoxLayout:
+        orientation: "horizontal"
+        spacing: dp(8)
+        size_hint_y: None
+        height: dp(56)
 
-    MDTextField:
-        mode: "outlined"
-        size_hint_x: 1
-        text: root.auth_screen.vm.p_input if root.auth_screen else ""
-        on_text: root.auth_screen.vm.p_input = self.text if root.auth_screen else ""
-        MDTextFieldLeadingIcon:
-            icon: "shield-account"
-        MDTextFieldHintText:
-            text: "p"
+        MDTextField:
+            mode: "outlined"
+            size_hint_x: 1
+            text: root.auth_screen.vm.remixsid_input if root.auth_screen else ""
+            on_text: root.auth_screen.vm.remixsid_input = self.text if root.auth_screen else ""
+            MDTextFieldLeadingIcon:
+                icon: "cookie"
+            MDTextFieldHintText:
+                text: "remixsid"
+
+        MDIconButton:
+            icon: "content-paste"
+            style: "tonal"
+            pos_hint: {"center_y": 0.5}
+            on_release: root.auth_screen.paste_remixsid() if root.auth_screen else None
+
+    BoxLayout:
+        orientation: "horizontal"
+        spacing: dp(8)
+        size_hint_y: None
+        height: dp(56)
+
+        MDTextField:
+            mode: "outlined"
+            size_hint_x: 1
+            text: root.auth_screen.vm.p_input if root.auth_screen else ""
+            on_text: root.auth_screen.vm.p_input = self.text if root.auth_screen else ""
+            MDTextFieldLeadingIcon:
+                icon: "shield-account"
+            MDTextFieldHintText:
+                text: "p"
+
+        MDIconButton:
+            icon: "content-paste"
+            style: "tonal"
+            pos_hint: {"center_y": 0.5}
+            on_release: root.auth_screen.paste_p() if root.auth_screen else None
 
 
 <WebModeContent>:

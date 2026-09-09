@@ -25,7 +25,8 @@ class MessagesRepository:
                 out=r["out"],
                 is_read=bool(r["is_read"]),
                 attachments=r.get("attachments", []),
-                fwd_messages=r.get("fwd_messages", [])
+                fwd_messages=r.get("fwd_messages", []),
+                reply_message=r.get("reply_message")
             ))
         return messages
 
@@ -124,6 +125,63 @@ class MessagesRepository:
             elif from_id == peer_id and chat_title:
                 m.sender_name = chat_title
                 m.sender_avatar = chat_avatar
+
+            # Resolve sender info for reply_message
+            if m.reply_message and isinstance(m.reply_message, dict):
+                r_from = m.reply_message.get("from_id")
+                try:
+                    r_from_int = int(r_from) if r_from is not None else 0
+                except (ValueError, TypeError):
+                    r_from_int = 0
+                if r_from_int > 0 and r_from_int in profiles:
+                    m.reply_message["sender_name"] = profiles[r_from_int]["name"]
+                    m.reply_message["sender_avatar"] = profiles[r_from_int]["avatar"]
+                elif r_from_int < 0 and abs(r_from_int) in groups:
+                    m.reply_message["sender_name"] = groups[abs(r_from_int)]["name"]
+                    m.reply_message["sender_avatar"] = groups[abs(r_from_int)]["avatar"]
+                elif not m.reply_message.get("sender_name"):
+                    m.reply_message["sender_name"] = "Собеседник"
+
+            # Resolve sender info and timestamp for fwd_messages (including nested)
+            if m.fwd_messages and isinstance(m.fwd_messages, list):
+                try:
+                    from src.utils.formatters import format_fwd_timestamp
+
+                    def _resolve_fwd_item(fwd_item):
+                        if not isinstance(fwd_item, dict):
+                            return
+                        f_from = fwd_item.get("from_id")
+                        try:
+                            f_from_int = int(f_from) if f_from is not None else 0
+                        except (ValueError, TypeError):
+                            f_from_int = 0
+                        if f_from_int > 0 and f_from_int in profiles:
+                            fwd_item["sender_name"] = profiles[f_from_int]["name"]
+                            fwd_item["sender_avatar"] = profiles[f_from_int]["avatar"]
+                        elif f_from_int < 0 and abs(f_from_int) in groups:
+                            fwd_item["sender_name"] = groups[abs(f_from_int)]["name"]
+                            fwd_item["sender_avatar"] = groups[abs(f_from_int)]["avatar"]
+                        elif not fwd_item.get("sender_name"):
+                            fwd_item["sender_name"] = "Сообщение"
+                        if "date" in fwd_item and "time_text" not in fwd_item:
+                            fwd_item["time_text"] = format_fwd_timestamp(fwd_item.get("date"))
+
+                        # Resolve reply_message inside this forward
+                        rep = fwd_item.get("reply_message")
+                        if rep and isinstance(rep, dict):
+                            _resolve_fwd_item(rep)
+
+                        nested = fwd_item.get("fwd_messages")
+                        if nested and isinstance(nested, list):
+                            for nf in nested:
+                                _resolve_fwd_item(nf)
+
+                    for fwd in m.fwd_messages:
+                        _resolve_fwd_item(fwd)
+                except Exception as e_fwd:
+                    logger.warning("Failed enriching fwd_messages: %s", e_fwd)
+
+
             models.append(m)
 
         # Cache to database
@@ -133,9 +191,9 @@ class MessagesRepository:
         models.sort(key=lambda m: (m.date, m.id))
         return models
 
-    async def send_message(self, peer_id: int, text: str) -> int:
-        """Sends a text message and returns the newly assigned message_id."""
-        msg_id = await api_client.messages_send(peer_id=peer_id, message=text)
+    async def send_message(self, peer_id: int, text: str, reply_to: Optional[int] = None) -> int:
+        """Sends a text message with optional reply_to and returns the newly assigned message_id."""
+        msg_id = await api_client.messages_send(peer_id=peer_id, message=text, reply_to=reply_to)
         return msg_id
 
     async def mark_as_read(self, peer_id: int, start_message_id: Optional[int] = None, is_channel: bool = False) -> int:

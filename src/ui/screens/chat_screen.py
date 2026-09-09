@@ -1,6 +1,7 @@
-from kivy.properties import ObjectProperty, BooleanProperty
+from kivy.properties import ObjectProperty, BooleanProperty, DictProperty
 from kivy.clock import Clock
 from kivy.metrics import dp
+from kivy.utils import platform
 from kivymd.uix.screen import MDScreen
 from src.domain.chat_viewmodel import ChatViewModel
 from src.core.constants import ScreenName
@@ -10,6 +11,7 @@ class ChatScreen(MDScreen):
     """View displaying single chat message stream with bidirectional pagination, unread tracking, and scroll fab."""
     vm = ObjectProperty(None)
     is_at_bottom = BooleanProperty(True)
+    replying_to = DictProperty(None, allownone=True)
 
     def __init__(self, **kwargs):
         self.vm = ChatViewModel()
@@ -254,9 +256,20 @@ class ChatScreen(MDScreen):
             self.is_at_bottom = True
             self.vm.jump_to_bottom()
 
+    def on_enter(self, *args):
+        """Resets native Android input state to the current text when entering chat."""
+        super().on_enter(*args)
+        if platform == "android":
+            from src.utils.android_clipboard import reset_android_input
+            current_text = self.ids.message_input.text if "message_input" in self.ids else ""
+            reset_android_input(current_text)
+
     def on_leave(self, *args):
-        """Syncs read progress upon leaving the screen."""
+        """Syncs read progress upon leaving the screen and clears native input state."""
         self.vm.sync_read_progress()
+        if platform == "android":
+            from src.utils.android_clipboard import reset_android_input
+            reset_android_input("")
 
     def on_back_pressed(self):
         """Returns to Dialogs screen and syncs read progress."""
@@ -264,6 +277,57 @@ class ChatScreen(MDScreen):
         if self.manager:
             self.manager.current = ScreenName.DIALOGS
 
+    def start_reply(self, msg_data: dict):
+        """Activates reply banner above input bar for the swiped message."""
+        self.replying_to = msg_data
+        if "message_input" in self.ids:
+            self.ids.message_input.focus = True
+
+    def cancel_reply(self):
+        """Dismisses the active reply preview banner."""
+        self.replying_to = None
+
+    def on_reply_clicked(self, target_msg_id: int):
+        """Navigates to the replied message, loading surrounding history from API if needed."""
+        rv = self.ids.get("rv_messages")
+        if not rv:
+            return
+
+        messages = self.vm.messages
+        target_idx = -1
+        for idx, m in enumerate(messages):
+            if m.get("message_id") == target_msg_id:
+                target_idx = idx
+                break
+
+        if target_idx != -1:
+            total = len(messages)
+            if total > 1:
+                target_scroll_y = max(0.0, min(1.0, 1.0 - (target_idx / (total - 1))))
+                rv.scroll_y = target_scroll_y
+                if hasattr(rv, "_update_effect_y_bounds"):
+                    rv._update_effect_y_bounds()
+            self.is_at_bottom = (target_idx >= total - 3)
+        else:
+            # Message is outside currently loaded window: fetch history centered on target message
+            def _jump_after_load():
+                Clock.schedule_once(lambda dt: self.on_reply_clicked(target_msg_id), 0.25)
+
+            self.vm.load_history_around_message(target_msg_id, on_complete=_jump_after_load)
+
     def on_send_pressed(self):
-        """Sends the message typed in the input field."""
-        self.vm.send_message()
+        """Sends the message typed in the input field with optional reply_to and preserves soft keyboard focus."""
+        reply_to = None
+        reply_preview = None
+        if self.replying_to:
+            reply_to = self.replying_to.get("message_id")
+            reply_preview = dict(self.replying_to)
+            self.replying_to = None
+
+        self.vm.send_message(reply_to=reply_to, reply_preview=reply_preview)
+        if "message_input" in self.ids:
+            inp = self.ids.message_input
+            inp.focus = True
+            from src.utils.android_clipboard import reset_android_input
+            reset_android_input("")
+            Clock.schedule_once(lambda dt: setattr(inp, "focus", True), 0.05)

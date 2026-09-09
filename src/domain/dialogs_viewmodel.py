@@ -104,6 +104,18 @@ class DialogsViewModel(BaseViewModel):
             existing_dict[item.peer_id] = item
         self._sort_and_set_all_dialogs(list(existing_dict.values()))
 
+    def sync_from_cache(self):
+        """Syncs in-memory dialogs with any updates in local SQLite database."""
+        async def _fetch():
+            return await dialogs_repo.get_cached_dialogs()
+
+        def _on_cached(cached):
+            if cached:
+                self._merge_and_set_dialogs(cached)
+                self._apply_folder_filter()
+
+        self.run_task(_fetch(), on_success=_on_cached, show_loader=False)
+
     def _resolve_user_styles(self, items: List[VKDialogItem]):
         """Queries users.get via zephyrianna endpoint for user dialogs to fetch custom impact_extra styles."""
         user_ids = [d.peer_id for d in items if 0 < d.peer_id < 2_000_000_000]

@@ -76,6 +76,27 @@ class AuthScreen(MDScreen):
         """Opens OAuth in default browser."""
         self.vm.open_browser_oauth()
 
+    def paste_browser_input(self):
+        """Pastes clipboard text directly into browser token/url field."""
+        from src.utils.android_clipboard import get_system_clipboard_text
+        text = get_system_clipboard_text()
+        if text:
+            self.vm.browser_input = text.strip()
+
+    def paste_remixsid(self):
+        """Pastes clipboard text directly into remixsid field."""
+        from src.utils.android_clipboard import get_system_clipboard_text
+        text = get_system_clipboard_text()
+        if text:
+            self.vm.remixsid_input = text.strip()
+
+    def paste_p(self):
+        """Pastes clipboard text directly into p cookie field."""
+        from src.utils.android_clipboard import get_system_clipboard_text
+        text = get_system_clipboard_text()
+        if text:
+            self.vm.p_input = text.strip()
+
     def on_back_pressed(self):
         """Cancels adding account and returns to settings."""
         self.is_add_account_mode = False
