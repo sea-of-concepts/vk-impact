@@ -56,6 +56,9 @@ class MessageBubble(RecycleDataViewBehavior, BoxLayout):
         super().refresh_view_attrs(rv, index, data)
         self.update_colors()
         self.rebuild_fwd_messages(data.get("fwd_messages", []))
+        av_w = self.ids.get("avatar_widget")
+        if av_w and av_w.source:
+            av_w.reload_avatar_if_needed()
 
     def on_is_outgoing(self, instance, value):
         self.update_colors()

@@ -160,12 +160,12 @@ def estimate_message_height(
     Accurately calculates message bubble height in dp to eliminate RecycleView layout dancing
     and ensure proper spacing between messages even on large text blocks.
     """
-    base_padding = 64  # content_box padding (16) + timestamp row (16) + spacings (12) + bubble row padding (8) + safety margin (12)
+    base_padding = 48  # content_box padding (16) + timestamp row (14) + spacings (8) + bubble row padding (4) + safety margin (6)
     if has_sender_name:
-        base_padding += 26  # Sender name header (16) + spacing (6) + margin (4)
+        base_padding += 20  # Sender name header (16) + spacing (4)
 
     if has_reply:
-        base_padding += 54  # Reply preview box (36) + spacing (6) + margin (12)
+        base_padding += 42  # Reply preview box (36) + spacing (4) + margin (2)
 
     fwd_extra = 0
     if fwd_count > 0:
@@ -177,7 +177,7 @@ def estimate_message_height(
 
     text_height = _measure_text_height(text, font_size_sp=15) if text else 0
     total = base_padding + text_height + fwd_extra
-    return max(60, int(total))
+    return max(52, int(total))
 
 
 

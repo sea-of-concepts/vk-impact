@@ -38,7 +38,7 @@ class CircularAvatar(RelativeLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.size_hint = (None, None)
-        self.size = (self.size_dp, self.size_dp)
+        self._update_size()
         self.bind(size_dp=self._update_size, source=self._on_source_change, peer_id=self._on_peer_change)
         if self.source:
             self._load_avatar(self.source)
@@ -57,6 +57,11 @@ class CircularAvatar(RelativeLayout):
     def _on_source_change(self, instance, value):
         self._load_avatar(value)
 
+    def reload_avatar_if_needed(self):
+        """Re-checks media cache if image was downloaded while widget was reused."""
+        if self.source and not self.local_source:
+            self._load_avatar(self.source)
+
     def _load_avatar(self, url: str):
         if not url:
             self.local_source = ""
@@ -67,8 +72,7 @@ class CircularAvatar(RelativeLayout):
             self.local_source = local
         else:
             self.local_source = ""
-            media_cache.fetch_image_async(url, on_ready=self._on_image_ready)
-
-    def _on_image_ready(self, local_path: str):
-        if local_path and self.source:
-            self.local_source = local_path
+            def _on_ready(local_path: str, target_url=url):
+                if local_path and self.source == target_url and not local_path.startswith("http"):
+                    self.local_source = local_path
+            media_cache.fetch_image_async(url, on_ready=_on_ready)

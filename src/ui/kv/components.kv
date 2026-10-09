@@ -224,14 +224,20 @@
 
         # Small sender avatar for incoming messages in group chats
         CircularAvatar:
+            id: avatar_widget
             source: root.sender_avatar
             size_dp: 32 if (not root.is_outgoing and root.sender_avatar) else 0
             size_hint: None, None
-            size: (dp(36), dp(32)) if (not root.is_outgoing and root.sender_avatar) else (0, 0)
+            size: (dp(32), dp(32)) if (not root.is_outgoing and root.sender_avatar) else (0, 0)
             opacity: 1 if (not root.is_outgoing and root.sender_avatar) else 0
             disabled: not (not root.is_outgoing and root.sender_avatar)
-            pos_hint: {"bottom": 1}
+            pos_hint: {"top": 1}
             impact_style: root.sender_impact_style
+
+        Widget:
+            size_hint: None, None
+            size: (dp(6), dp(1)) if (not root.is_outgoing and root.sender_avatar) else (0, 0)
+            opacity: 0
 
         # Bubble container
         BoxLayout:
