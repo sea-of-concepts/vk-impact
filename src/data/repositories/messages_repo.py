@@ -194,6 +194,24 @@ class MessagesRepository:
             except Exception as e_fetch:
                 logger.warning("Failed batch fetching missing users %s: %s", still_missing_uids, e_fetch)
 
+        # 4. Batch fetch remaining missing groups from VK API
+        if missing_gids:
+            try:
+                g_resp = await api_client.request("groups.getById", {
+                    "group_ids": ",".join(str(gid) for gid in missing_gids),
+                    "fields": "photo_100,photo_200"
+                })
+                g_items = g_resp if isinstance(g_resp, list) else g_resp.get("groups", [])
+                for g in g_items:
+                    gid = g.get("id")
+                    if gid:
+                        groups[gid] = {
+                            "name": g.get("name", "Сообщество"),
+                            "avatar": g.get("photo_100") or g.get("photo_200") or g.get("photo_50") or ""
+                        }
+            except Exception as e_g:
+                logger.debug("Failed batch fetching missing groups: %s", e_g)
+
         # Fallback to dialog title and avatar for channels
         chat_title, chat_avatar = "", ""
         try:

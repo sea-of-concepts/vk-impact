@@ -132,8 +132,8 @@ def clean_message_text(text: str) -> str:
     return html.unescape(cleaned)
 
 
-def _measure_text_height(text: str, font_size_sp: int = 15) -> int:
-    """Measures exact rendered text height in dp using Kivy's CoreLabel engine targeting mobile bubble width."""
+def _measure_text_height(text: str, font_size_sp: int = 15, is_outgoing: bool = False) -> int:
+    """Measures exact rendered text height in dp matching Kivy Label word-wrapping."""
     if not text:
         return 0
     clean_text = clean_message_text(text)
@@ -144,23 +144,35 @@ def _measure_text_height(text: str, font_size_sp: int = 15) -> int:
 
         win_w = Window.width if (Window and getattr(Window, "width", 0) > 0) else dp(380)
         win_w_dp = min(dp(390), win_w)
-        # Mobile bubble inner text width: (window - outer_padding(16)) * 0.78 - content_box_padding(28)
         bubble_text_w = max(dp(160), (win_w_dp - dp(16)) * 0.78 - dp(28))
         core = CoreLabel(text=clean_text, font_size=sp(font_size_sp), text_size=(bubble_text_w, None))
         core.refresh()
         if core.texture and core.texture.size[1] > 0:
-            return int(core.texture.size[1] / dp(1)) + 1
+            return int(core.texture.size[1] / dp(1))
     except Exception:
         pass
 
-    # Safe fallback estimate
-    lines = clean_text.split("\n")
+    # Thread-safe accurate fallback matching Kivy Label's 15sp line height (18dp)
+    limit = 32 if is_outgoing else 28
     total_lines = 0
-    for line in lines:
-        line_len = len(line)
-        wrapped_count = max(1, (line_len + 27) // 28)
-        total_lines += wrapped_count
-    return total_lines * (font_size_sp + 5)
+    for para in clean_text.split("\n"):
+        if not para:
+            total_lines += 1
+            continue
+        cur = 0
+        pl = 1
+        for w in para.split(" "):
+            wl = len(w)
+            if cur == 0:
+                cur = wl
+            elif cur + 1 + wl <= limit:
+                cur += 1 + wl
+            else:
+                pl += 1
+                cur = wl
+        total_lines += pl
+    line_h = 18 if font_size_sp >= 15 else 16
+    return total_lines * line_h
 
 
 def check_time_needs_own_line(text: str, is_outgoing: bool = False, max_w_dp: float = 235.0) -> bool:
@@ -208,10 +220,48 @@ def check_time_needs_own_line(text: str, is_outgoing: bool = False, max_w_dp: fl
         last_w_dp = (c_last.texture.size[0] / dp(1)) if (c_last.texture and c_last.texture.size[0] > 0) else 0
         return (last_w_dp + time_space_dp) > max_w_dp
     except Exception:
-        last_chars = len(last_paragraph) % 28
-        if last_chars == 0 and len(last_paragraph) > 0:
-            last_chars = 28
-        return last_chars > 20
+        # Thread-safe character-based fallback with word boundary tracking
+        limit = 32 if is_outgoing else 28
+        time_chars = 8 if is_outgoing else 6
+        cur = 0
+        for w in words:
+            wl = len(w)
+            if cur == 0:
+                cur = wl
+            elif cur + 1 + wl <= limit:
+                cur += 1 + wl
+            else:
+                cur = wl
+        return (cur + time_chars) > limit
+
+
+def format_fallback_attachment_text(attachments: list) -> str:
+    """Returns readable fallback badge text for non-photo attachments if message text is empty."""
+    if not attachments or not isinstance(attachments, list):
+        return ""
+    labels = []
+    for att in attachments:
+        if not isinstance(att, dict):
+            continue
+        t = att.get("type", "")
+        if t == "sticker":
+            labels.append("[Стикер]")
+        elif t in ("audio_message", "audiomsg"):
+            labels.append("[Голосовое сообщение]")
+        elif t == "audio":
+            labels.append("[Аудиозапись]")
+        elif t == "doc":
+            doc_title = att.get("doc", {}).get("title", "")
+            labels.append(f"[Документ: {doc_title}]" if doc_title else "[Документ]")
+        elif t == "video":
+            labels.append("[Видеозапись]")
+        elif t == "wall":
+            labels.append("[Запись на стене]")
+        elif t == "link":
+            labels.append("[Ссылка]")
+        elif t != "photo":
+            labels.append("[Вложение]")
+    return " ".join(labels)
 
 
 def extract_photo_attachments(attachments: list) -> list:
@@ -295,7 +345,7 @@ def estimate_message_height(
     if has_photos and not has_text and not has_sender_name:
         base_padding = 8
     else:
-        base_padding = 10  # content_box vertical padding (8) + bubble_row padding (2)
+        base_padding = 12  # content_box vertical padding (8) + bubble_row padding (4)
 
     if has_sender_name:
         base_padding += 17  # Sender name header (15) + spacing (2)
@@ -311,7 +361,9 @@ def estimate_message_height(
     if has_text:
         if time_needs_own_line:
             base_padding += 13  # Extra line for timestamp only when text is too wide to share line
-        text_height = _measure_text_height(clean_text, font_size_sp=15)
+        text_height = _measure_text_height(clean_text, font_size_sp=15, is_outgoing=not has_sender_name)
+    elif not has_photos:
+        text_height = 14  # Standalone timestamp min height
     else:
         text_height = 0
 

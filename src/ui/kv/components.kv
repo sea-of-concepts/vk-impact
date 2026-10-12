@@ -220,7 +220,7 @@
 <MessageBubble>:
     orientation: "vertical"
     size_hint_y: None
-    height: max((bubble_row.height if bubble_row else dp(36)) + (dp(28) if root.show_new_divider else 0) + dp(4), dp(36))
+    height: root.msg_size[1] if (root.msg_size and root.msg_size[1] > 0) else dp(56)
 
     # "Новые сообщения" divider
     BoxLayout:
@@ -267,8 +267,7 @@
     BoxLayout:
         id: bubble_row
         orientation: "horizontal"
-        size_hint_y: None
-        height: max(content_box.height, avatar_widget.height if (avatar_widget and avatar_widget.opacity > 0) else 0)
+        size_hint_y: 1
         x: root.x + root.swipe_x
         padding: [dp(8), dp(2)]
         spacing: 0
@@ -283,17 +282,18 @@
         CircularAvatar:
             id: avatar_widget
             source: root.sender_avatar
-            size_dp: 32 if (not root.is_outgoing and root.sender_avatar) else 0
+            peer_id: root.from_id
+            size_dp: 32 if (not root.is_outgoing and (root.is_group_chat or root.sender_avatar)) else 0
             size_hint: None, None
-            size: (dp(32), dp(32)) if (not root.is_outgoing and root.sender_avatar) else (0, 0)
-            opacity: 1 if (not root.is_outgoing and root.sender_avatar) else 0
-            disabled: not (not root.is_outgoing and root.sender_avatar)
+            size: (dp(32), dp(32)) if (not root.is_outgoing and (root.is_group_chat or root.sender_avatar)) else (0, 0)
+            opacity: 1 if (not root.is_outgoing and (root.is_group_chat or root.sender_avatar)) else 0
+            disabled: not (not root.is_outgoing and (root.is_group_chat or root.sender_avatar))
             pos_hint: {"y": 0}
             impact_style: root.sender_impact_style
 
         Widget:
             size_hint: None, None
-            size: (dp(6), dp(1)) if (not root.is_outgoing and root.sender_avatar) else (0, 0)
+            size: (dp(6), dp(1)) if (not root.is_outgoing and (root.is_group_chat or root.sender_avatar)) else (0, 0)
             opacity: 0
 
         # Bubble container
@@ -399,13 +399,13 @@
             RelativeLayout:
                 id: text_container
                 size_hint_y: None
-                height: ((msg_label.height if root.text else 0) + (dp(13) if root.time_needs_own_line else 0)) if root.text else 0
-                opacity: 1 if root.text else 0
-                disabled: not root.text
+                height: max(dp(14), (msg_label.height if root.text else 0) + (dp(13) if root.time_needs_own_line else 0)) if (root.text or not root.photos) else 0
+                opacity: 1 if (root.text or not root.photos) else 0
+                disabled: not (root.text or not root.photos)
 
                 Label:
                     id: msg_label
-                    text: clean_message_text(root.text)
+                    text: root.display_text
                     color: (1, 1, 1, 1) if root.is_outgoing else app.bubble_incoming_text
                     text_size: (self.width, None)
                     size_hint: 1, None

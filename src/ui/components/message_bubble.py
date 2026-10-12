@@ -59,12 +59,18 @@ class ForwardedMessageItem(BoxLayout):
     indent_dp = NumericProperty(0)
 
 
+from kivy.clock import Clock
+
+
 class MessageBubble(RecycleDataViewBehavior, BoxLayout):
     """Chat message bubble with exact pre-calculated size, reply preview, and forward support."""
 
     index = None
     text = StringProperty("")
+    display_text = StringProperty("")
     photos = ListProperty([])
+    from_id = NumericProperty(0)
+    is_group_chat = BooleanProperty(False)
     sender_name = StringProperty("")
     sender_avatar = StringProperty("")
     sender_impact_style = StringProperty("")
@@ -86,20 +92,51 @@ class MessageBubble(RecycleDataViewBehavior, BoxLayout):
         self._touch_start_x = 0
         self._touch_start_y = 0
         self._is_swiping = False
+        self.rv = None
 
     def refresh_view_attrs(self, rv, index, data):
         self.index = index
+        self.rv = rv
         self.swipe_x = 0
         self._is_swiping = False
         super().refresh_view_attrs(rv, index, data)
+        sz = data.get("msg_size")
+        if sz and sz[1]:
+            self.height = sz[1]
+        self.from_id = data.get("from_id", 0)
+        self.is_group_chat = bool(data.get("is_group_chat", False))
         self.time_needs_own_line = bool(data.get("time_needs_own_line", False))
         self.photos = data.get("photos", [])
+        self.update_display_text()
         self.update_colors()
         self.rebuild_photos(self.photos)
         self.rebuild_fwd_messages(data.get("fwd_messages", []))
         av_w = self.ids.get("avatar_widget")
         if av_w and av_w.source:
             av_w.reload_avatar_if_needed()
+        Clock.schedule_once(self._sync_rendered_height, 0.05)
+
+    def update_display_text(self):
+        if not self.text:
+            self.display_text = ""
+            return
+        t = clean_message_text(self.text)
+        if not self.time_needs_own_line:
+            # Append non-breaking margin so text never collides with inline timestamp
+            self.display_text = t + ("       " if self.is_outgoing else "     ")
+        else:
+            self.display_text = t
+
+    def _sync_rendered_height(self, dt=0):
+        c_box = self.ids.get("content_box")
+        if not c_box:
+            return
+        real_h = c_box.minimum_height + (dp(28) if self.show_new_divider else 0) + dp(4)
+        if real_h > dp(24) and abs(self.height - real_h) > dp(6):
+            self.height = real_h
+            if self.rv and self.index is not None and self.index < len(self.rv.data):
+                self.rv.data[self.index]["msg_size"] = [None, real_h]
+                Clock.schedule_once(lambda _dt: self.rv.refresh_from_data(), 0)
 
     def on_photos(self, instance, value):
         self.rebuild_photos(value)

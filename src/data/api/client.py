@@ -188,7 +188,11 @@ class VKApiClient:
             
         vk_task = self.request("users.get", params)
         impact_task = self.fetch_impact_extra(user_ids)
-        vk_resp, impact_map = await asyncio.gather(vk_task, impact_task, return_exceptions=False)
+        res_vk, res_impact = await asyncio.gather(vk_task, impact_task, return_exceptions=True)
+        if isinstance(res_vk, Exception):
+            raise res_vk
+        vk_resp = res_vk if isinstance(res_vk, list) else []
+        impact_map = res_impact if isinstance(res_impact, dict) else {}
 
         users = []
         for u in vk_resp:

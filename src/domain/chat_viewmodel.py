@@ -12,7 +12,7 @@ from src.core.events import event_bus
 from src.core.constants import EventType
 from src.core.logger import logger
 from src.utils.async_tools import run_async
-from src.utils.formatters import format_timestamp, estimate_message_height, check_time_needs_own_line, clean_message_text, extract_photo_attachments
+from src.utils.formatters import format_timestamp, estimate_message_height, check_time_needs_own_line, clean_message_text, extract_photo_attachments, format_fallback_attachment_text
 
 
 class ChatViewModel(BaseViewModel):
@@ -333,6 +333,7 @@ class ChatViewModel(BaseViewModel):
         opt_item = {
             "message_id": temp_id,
             "from_id": 0,
+            "is_group_chat": (self.peer_id >= 2000000000 or self.peer_id < 0),
             "text": text,
             "photos": [],
             "sender_name": "",
@@ -385,31 +386,52 @@ class ChatViewModel(BaseViewModel):
         self.run_task(_send(), on_success=_on_sent, show_loader=False)
 
     def _enrich_user_in_background(self, uid: int, msg_id: int):
-        """Asynchronously fetches user profile and updates UI messages & DB in-place."""
-        if uid <= 0:
+        """Asynchronously fetches user or group profile and updates UI messages & DB in-place."""
+        if not uid:
             return
 
         async def _fetch():
-            u = await users_repo.get_user(uid)
-            if u:
-                fn = u.get("first_name", "").strip()
-                ln = u.get("last_name", "").strip()
-                full_n = f"{fn} {ln}".strip() or "Пользователь"
-                av = u.get("photo_100") or u.get("photo_200") or ""
-                st = u.get("impact_style", "") or ("zephyr" if uid == 708902696 else "")
-
-                # Persist enriched sender into SQLite database
+            full_n, av, st = "", "", ""
+            if uid > 0:
+                cached_u = await db_manager.get_cached_user(uid)
+                if not cached_u:
+                    cached_u = await users_repo.get_user(uid)
+                if cached_u:
+                    fn = cached_u.get("first_name", "").strip()
+                    ln = cached_u.get("last_name", "").strip()
+                    full_n = f"{fn} {ln}".strip() or "Пользователь"
+                    av = cached_u.get("photo_100") or cached_u.get("photo_200") or ""
+                    st = cached_u.get("impact_style", "") or ("zephyr" if uid == 708902696 else "")
+            else:
+                gid = abs(uid)
                 try:
-                    import aiosqlite
-                    from src.data.database.db_manager import db_manager
-                    async with aiosqlite.connect(db_manager.db_path) as db:
-                        await db.execute(
-                            "UPDATE messages SET sender_name = ?, sender_avatar = ? WHERE (from_id = ? OR id = ?) AND (sender_name IS NULL OR sender_name = '' OR sender_name LIKE 'ID %')",
-                            (full_n, av, uid, msg_id)
-                        )
-                        await db.commit()
+                    g_resp = await api_client.request("groups.getById", {
+                        "group_ids": str(gid),
+                        "fields": "photo_100,photo_200"
+                    })
+                    g_items = g_resp if isinstance(g_resp, list) else g_resp.get("groups", [])
+                    if g_items:
+                        g = g_items[0]
+                        full_n = g.get("name", "Сообщество")
+                        av = g.get("photo_100") or g.get("photo_200") or g.get("photo_50") or ""
                 except Exception:
                     pass
+
+            if not full_n:
+                return
+
+            # Persist enriched sender into SQLite database
+            try:
+                import aiosqlite
+                from src.data.database.db_manager import db_manager
+                async with aiosqlite.connect(db_manager.db_path) as db:
+                    await db.execute(
+                        "UPDATE messages SET sender_name = ?, sender_avatar = ? WHERE (from_id = ? OR id = ?) AND (sender_name IS NULL OR sender_name = '' OR sender_name LIKE 'ID %')",
+                        (full_n, av, uid, msg_id)
+                    )
+                    await db.commit()
+            except Exception:
+                pass
 
                 def _apply(dt):
                     new_messages = []
@@ -452,6 +474,8 @@ class ChatViewModel(BaseViewModel):
             raw_text = clean_message_text(m.text or "")
             attachments = getattr(m, "attachments", None) or []
             photos = extract_photo_attachments(attachments)
+            if not raw_text and not photos and attachments:
+                raw_text = format_fallback_attachment_text(attachments)
 
             sender_name = m.sender_name if not m.is_outgoing else ""
             sender_avatar = m.sender_avatar if not m.is_outgoing else ""
@@ -505,6 +529,7 @@ class ChatViewModel(BaseViewModel):
             return {
                 "message_id": m.id,
                 "from_id": m.from_id,
+                "is_group_chat": (self.peer_id >= 2000000000 or self.peer_id < 0),
                 "text": raw_text,
                 "photos": photos,
                 "sender_name": sender_name,
@@ -781,6 +806,8 @@ class ChatViewModel(BaseViewModel):
             run_async(_fetch_full_attachments(message_id))
 
         clean_text = clean_message_text(text)
+        if not clean_text and not photos and raw_attachments:
+            clean_text = format_fallback_attachment_text(raw_attachments if isinstance(raw_attachments, list) else [])
         has_text = bool(clean_text.strip())
         has_sender = bool(sender_name and not is_out)
         time_needs_own = check_time_needs_own_line(clean_text, is_out) if has_text else False
@@ -797,6 +824,7 @@ class ChatViewModel(BaseViewModel):
         new_item = {
             "message_id": message_id,
             "from_id": from_id,
+            "is_group_chat": (self.peer_id >= 2000000000 or self.peer_id < 0),
             "text": clean_text,
             "photos": photos,
             "sender_name": sender_name,
