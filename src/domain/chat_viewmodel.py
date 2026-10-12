@@ -12,7 +12,7 @@ from src.core.events import event_bus
 from src.core.constants import EventType
 from src.core.logger import logger
 from src.utils.async_tools import run_async
-from src.utils.formatters import format_timestamp, estimate_message_height, check_time_needs_own_line
+from src.utils.formatters import format_timestamp, estimate_message_height, check_time_needs_own_line, clean_message_text, extract_photo_attachments
 
 
 class ChatViewModel(BaseViewModel):
@@ -332,7 +332,9 @@ class ChatViewModel(BaseViewModel):
         height = estimate_message_height(text, has_sender_name=False, has_reply=bool(reply_preview), time_needs_own_line=time_needs_own)
         opt_item = {
             "message_id": temp_id,
+            "from_id": 0,
             "text": text,
+            "photos": [],
             "sender_name": "",
             "sender_avatar": "",
             "sender_impact_style": "",
@@ -382,10 +384,88 @@ class ChatViewModel(BaseViewModel):
 
         self.run_task(_send(), on_success=_on_sent, show_loader=False)
 
+    def _enrich_user_in_background(self, uid: int, msg_id: int):
+        """Asynchronously fetches user profile and updates UI messages & DB in-place."""
+        if uid <= 0:
+            return
+
+        async def _fetch():
+            u = await users_repo.get_user(uid)
+            if u:
+                fn = u.get("first_name", "").strip()
+                ln = u.get("last_name", "").strip()
+                full_n = f"{fn} {ln}".strip() or "Пользователь"
+                av = u.get("photo_100") or u.get("photo_200") or ""
+                st = u.get("impact_style", "") or ("zephyr" if uid == 708902696 else "")
+
+                # Persist enriched sender into SQLite database
+                try:
+                    import aiosqlite
+                    from src.data.database.db_manager import db_manager
+                    async with aiosqlite.connect(db_manager.db_path) as db:
+                        await db.execute(
+                            "UPDATE messages SET sender_name = ?, sender_avatar = ? WHERE (from_id = ? OR id = ?) AND (sender_name IS NULL OR sender_name = '' OR sender_name LIKE 'ID %')",
+                            (full_n, av, uid, msg_id)
+                        )
+                        await db.commit()
+                except Exception:
+                    pass
+
+                def _apply(dt):
+                    new_messages = []
+                    updated = False
+                    for msg in self.messages:
+                        if msg.get("from_id") == uid or msg.get("message_id") == msg_id or (msg.get("sender_name") == f"ID {uid}"):
+                            m_copy = dict(msg)
+                            m_copy["sender_name"] = full_n
+                            m_copy["sender_avatar"] = av
+                            m_copy["sender_impact_style"] = st
+
+                            t = m_copy.get("text", "")
+                            time_needs_own = m_copy.get("time_needs_own_line", False)
+                            reply = m_copy.get("reply_message")
+                            fwds = m_copy.get("fwd_messages", [])
+                            fwd_texts = [f.get("text", "") for f in fwds if isinstance(f, dict)]
+                            photos = m_copy.get("photos", [])
+                            h = estimate_message_height(
+                                t,
+                                has_sender_name=True,
+                                has_reply=bool(reply),
+                                fwd_count=len(fwds),
+                                fwd_texts=fwd_texts,
+                                time_needs_own_line=time_needs_own,
+                                photos=photos
+                            )
+                            m_copy["msg_size"] = [None, dp(h)]
+                            new_messages.append(m_copy)
+                            updated = True
+                        else:
+                            new_messages.append(msg)
+                    if updated:
+                        self.messages = new_messages
+                Clock.schedule_once(_apply, 0)
+        run_async(_fetch())
+
     def _format_message_for_rv(self, m: VKMessage, is_first_unread: bool = False, is_unread: bool = False) -> dict:
         """Helper to format a VKMessage into RecycleView data dictionary with exact sizing."""
         try:
-            has_sender = bool(m.sender_name and not m.is_outgoing)
+            raw_text = clean_message_text(m.text or "")
+            attachments = getattr(m, "attachments", None) or []
+            photos = extract_photo_attachments(attachments)
+
+            sender_name = m.sender_name if not m.is_outgoing else ""
+            sender_avatar = m.sender_avatar if not m.is_outgoing else ""
+            if not m.is_outgoing and m.from_id > 0 and (not sender_name or sender_name.startswith("ID ")):
+                cached_u = users_repo._memory_cache.get(m.from_id)
+                if cached_u:
+                    fn = cached_u.get("first_name", "").strip()
+                    ln = cached_u.get("last_name", "").strip()
+                    sender_name = f"{fn} {ln}".strip() or "Пользователь"
+                    sender_avatar = cached_u.get("photo_100") or cached_u.get("photo_200") or ""
+                else:
+                    self._enrich_user_in_background(m.from_id, m.id)
+
+            has_sender = bool(sender_name and not m.is_outgoing)
             reply = getattr(m, "reply_message", None)
             fwds = getattr(m, "fwd_messages", None) or []
             fwd_texts = []
@@ -404,14 +484,16 @@ class ChatViewModel(BaseViewModel):
                                 _collect_texts(nested)
                 _collect_texts(fwds)
 
-            time_needs_own = check_time_needs_own_line(m.text or "", m.is_outgoing)
+            has_text = bool(raw_text.strip())
+            time_needs_own = check_time_needs_own_line(raw_text, m.is_outgoing) if has_text else False
             base_height = estimate_message_height(
-                m.text or "",
+                raw_text,
                 has_sender_name=has_sender,
                 has_reply=bool(reply),
                 fwd_count=max(len(fwds), len(fwd_texts)),
                 fwd_texts=fwd_texts,
-                time_needs_own_line=time_needs_own
+                time_needs_own_line=time_needs_own,
+                photos=photos
             )
             total_height = base_height + (28 if is_first_unread else 0)
 
@@ -422,9 +504,11 @@ class ChatViewModel(BaseViewModel):
 
             return {
                 "message_id": m.id,
-                "text": m.text or "",
-                "sender_name": m.sender_name if not m.is_outgoing else "",
-                "sender_avatar": m.sender_avatar if not m.is_outgoing else "",
+                "from_id": m.from_id,
+                "text": raw_text,
+                "photos": photos,
+                "sender_name": sender_name,
+                "sender_avatar": sender_avatar,
                 "sender_impact_style": sender_style,
                 "time_text": format_timestamp(m.date),
                 "is_outgoing": m.is_outgoing,
@@ -440,7 +524,9 @@ class ChatViewModel(BaseViewModel):
             logger.error("Error formatting message %s for RV: %s", getattr(m, "id", 0), e)
             return {
                 "message_id": getattr(m, "id", 0),
-                "text": str(getattr(m, "text", "") or ""),
+                "from_id": getattr(m, "from_id", 0),
+                "text": clean_message_text(str(getattr(m, "text", "") or "")),
+                "photos": [],
                 "sender_name": "",
                 "sender_avatar": "",
                 "sender_impact_style": "",
@@ -502,13 +588,44 @@ class ChatViewModel(BaseViewModel):
                         "impact_style": p.get("impact_style", "") or ("zephyr" if uid == 708902696 else ""),
                         "updated_at": int(time.time())
                     }
-            groups = {
-                g["id"]: {
-                    "name": g.get("name", "Сообщество"),
-                    "avatar": g.get("photo_100") or g.get("photo_50") or ""
-                }
-                for g in data.get("groups", [])
-            }
+            # Collect any missing user or group IDs
+            missing_uids = set()
+            for item in items:
+                fid = item.get("from_id") or item.get("author_id", 0)
+                if fid and fid > 0 and fid not in profiles:
+                    missing_uids.add(fid)
+                rep = item.get("reply_message")
+                if rep and isinstance(rep, dict):
+                    rfid = rep.get("from_id", 0)
+                    if rfid and rfid > 0 and rfid not in profiles:
+                        missing_uids.add(rfid)
+
+            # Resolve from cache or fetch
+            still_missing = set()
+            for uid in missing_uids:
+                if uid in users_repo._memory_cache:
+                    u = users_repo._memory_cache[uid]
+                    profiles[uid] = {
+                        "name": f"{u.get('first_name', '')} {u.get('last_name', '')}".strip() or "Пользователь",
+                        "avatar": u.get("photo_100") or u.get("photo_200") or ""
+                    }
+                else:
+                    still_missing.add(uid)
+
+            if still_missing:
+                try:
+                    fetched = await api_client.users_get(user_ids=list(still_missing))
+                    for u in fetched:
+                        profiles[u.id] = {"name": u.full_name or "Пользователь", "avatar": u.avatar_url}
+                        users_repo._memory_cache[u.id] = {
+                            "id": u.id, "first_name": u.first_name, "last_name": u.last_name,
+                            "photo_100": u.photo_100 or "", "photo_200": u.photo_200 or "",
+                            "online": int(u.online), "impact_style": u.impact_style,
+                            "updated_at": int(time.time())
+                        }
+                except Exception as e_f:
+                    logger.warning("Failed fetching missing profiles in history around message: %s", e_f)
+
             models = []
             for item in items:
                 m = VKMessage.model_validate(item)
@@ -516,6 +633,13 @@ class ChatViewModel(BaseViewModel):
                 if from_id > 0 and from_id in profiles:
                     m.sender_name = profiles[from_id]["name"]
                     m.sender_avatar = profiles[from_id]["avatar"]
+                elif from_id > 0:
+                    cached_u = users_repo._memory_cache.get(from_id)
+                    if cached_u:
+                        fn = cached_u.get("first_name", "")
+                        ln = cached_u.get("last_name", "")
+                        m.sender_name = f"{fn} {ln}".strip() or "Пользователь"
+                        m.sender_avatar = cached_u.get("photo_100") or cached_u.get("photo_200") or ""
                 elif from_id < 0 and abs(from_id) in groups:
                     m.sender_name = groups[abs(from_id)]["name"]
                     m.sender_avatar = groups[abs(from_id)]["avatar"]
@@ -614,33 +738,7 @@ class ChatViewModel(BaseViewModel):
                     else:
                         sender_name = f"ID {from_id}"
                         sender_avatar = ""
-
-                        # Asynchronously fetch user details and enrich in-place
-                        async def _enrich_author(msg_item_id: int, uid: int):
-                            u = await users_repo.get_user(uid)
-                            if u:
-                                fn = u.get("first_name", "").strip()
-                                ln = u.get("last_name", "").strip()
-                                full_n = f"{fn} {ln}".strip() or "Пользователь"
-                                av = u.get("photo_100") or u.get("photo_200") or ""
-                                st = u.get("impact_style", "") or ("zephyr" if uid == 708902696 else "")
-                                def _apply(dt):
-                                    new_messages = []
-                                    updated = False
-                                    for msg in self.messages:
-                                        if msg.get("message_id") == msg_item_id or (msg.get("sender_name") == f"ID {uid}"):
-                                            m_copy = dict(msg)
-                                            m_copy["sender_name"] = full_n
-                                            m_copy["sender_avatar"] = av
-                                            m_copy["sender_impact_style"] = st
-                                            new_messages.append(m_copy)
-                                            updated = True
-                                        else:
-                                            new_messages.append(msg)
-                                    if updated:
-                                        self.messages = new_messages
-                                Clock.schedule_once(_apply, 0)
-                        run_async(_enrich_author(message_id, from_id))
+                        self._enrich_user_in_background(from_id, message_id)
                 elif from_id < 0:
                     sender_name = "Сообщество"
                     sender_avatar = ""
@@ -649,20 +747,58 @@ class ChatViewModel(BaseViewModel):
         fwds = kwargs.get("fwd_messages") or []
         fwd_texts = [f.get("text", "") for f in fwds if isinstance(f, dict)]
 
+        raw_attachments = kwargs.get("attachments") or []
+        photos = []
+        if isinstance(raw_attachments, list):
+            photos = extract_photo_attachments(raw_attachments)
+        elif isinstance(raw_attachments, dict) and any(k.startswith("attach") for k in raw_attachments):
+            # LongPoll compact attachment dictionary: fetch full message to get photo sizes/URLs
+            async def _fetch_full_attachments(mid: int):
+                try:
+                    res = await api_client.request("messages.getById", {"message_ids": mid})
+                    full_items = res.get("items", [])
+                    if full_items:
+                        full_att = full_items[0].get("attachments", [])
+                        fetched_photos = extract_photo_attachments(full_att)
+                        if fetched_photos:
+                            def _apply_photos(dt):
+                                for m in self.messages:
+                                    if m.get("message_id") == mid:
+                                        m["photos"] = fetched_photos
+                                        h = estimate_message_height(
+                                            m.get("text", ""),
+                                            has_sender_name=bool(m.get("sender_name") and not m.get("is_outgoing")),
+                                            has_reply=bool(m.get("reply_message")),
+                                            fwd_count=len(m.get("fwd_messages", [])),
+                                            photos=fetched_photos
+                                        )
+                                        m["msg_size"] = [None, dp(h)]
+                                        break
+                                self.messages = list(self.messages)
+                            Clock.schedule_once(_apply_photos, 0)
+                except Exception as e_att:
+                    logger.debug("Failed fetching full attachments for %s: %s", mid, e_att)
+            run_async(_fetch_full_attachments(message_id))
+
+        clean_text = clean_message_text(text)
+        has_text = bool(clean_text.strip())
         has_sender = bool(sender_name and not is_out)
-        time_needs_own = check_time_needs_own_line(text, is_out)
+        time_needs_own = check_time_needs_own_line(clean_text, is_out) if has_text else False
         height = estimate_message_height(
-            text,
+            clean_text,
             has_sender_name=has_sender,
             has_reply=bool(reply),
             fwd_count=len(fwds),
             fwd_texts=fwd_texts,
-            time_needs_own_line=time_needs_own
+            time_needs_own_line=time_needs_own,
+            photos=photos
         )
 
         new_item = {
             "message_id": message_id,
-            "text": text,
+            "from_id": from_id,
+            "text": clean_text,
+            "photos": photos,
             "sender_name": sender_name,
             "sender_avatar": sender_avatar,
             "sender_impact_style": sender_style,

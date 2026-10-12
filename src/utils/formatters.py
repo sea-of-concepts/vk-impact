@@ -121,10 +121,22 @@ def truncate_text(text: str, max_length: int = 50) -> str:
     return single_line[:max_length - 3] + "..."
 
 
+import html
+
+
+def clean_message_text(text: str) -> str:
+    """Unescapes HTML entities (&quot;, &amp;, &lt;, &gt;) and converts <br> tags to standard newlines."""
+    if not text:
+        return ""
+    cleaned = text.replace("<br>", "\n").replace("<br/>", "\n").replace("<BR>", "\n")
+    return html.unescape(cleaned)
+
+
 def _measure_text_height(text: str, font_size_sp: int = 15) -> int:
     """Measures exact rendered text height in dp using Kivy's CoreLabel engine targeting mobile bubble width."""
     if not text:
         return 0
+    clean_text = clean_message_text(text)
     try:
         from kivy.core.text import Label as CoreLabel
         from kivy.core.window import Window
@@ -132,20 +144,21 @@ def _measure_text_height(text: str, font_size_sp: int = 15) -> int:
 
         win_w = Window.width if (Window and getattr(Window, "width", 0) > 0) else dp(380)
         win_w_dp = min(dp(390), win_w)
-        bubble_text_w = max(dp(160), (win_w_dp - dp(38)) * 0.78 - dp(28))
-        core = CoreLabel(text=text, font_size=sp(font_size_sp), text_size=(bubble_text_w, None))
+        # Mobile bubble inner text width: (window - outer_padding(16)) * 0.78 - content_box_padding(28)
+        bubble_text_w = max(dp(160), (win_w_dp - dp(16)) * 0.78 - dp(28))
+        core = CoreLabel(text=clean_text, font_size=sp(font_size_sp), text_size=(bubble_text_w, None))
         core.refresh()
         if core.texture and core.texture.size[1] > 0:
-            return int(core.texture.size[1] / dp(1)) + 4
+            return int(core.texture.size[1] / dp(1)) + 1
     except Exception:
         pass
 
-    # Safe fallback estimate: ~26 characters per line for 78% bubble width on mobile screens
-    lines = text.split("\n")
+    # Safe fallback estimate
+    lines = clean_text.split("\n")
     total_lines = 0
     for line in lines:
         line_len = len(line)
-        wrapped_count = max(1, (line_len + 25) // 26)
+        wrapped_count = max(1, (line_len + 27) // 28)
         total_lines += wrapped_count
     return total_lines * (font_size_sp + 5)
 
@@ -157,8 +170,9 @@ def check_time_needs_own_line(text: str, is_outgoing: bool = False, max_w_dp: fl
     """
     if not text:
         return False
+    clean_text = clean_message_text(text)
     time_space_dp = 54.0 if is_outgoing else 40.0
-    lines = text.split("\n")
+    lines = clean_text.split("\n")
     last_paragraph = lines[-1].strip()
     if not last_paragraph:
         return False
@@ -194,10 +208,67 @@ def check_time_needs_own_line(text: str, is_outgoing: bool = False, max_w_dp: fl
         last_w_dp = (c_last.texture.size[0] / dp(1)) if (c_last.texture and c_last.texture.size[0] > 0) else 0
         return (last_w_dp + time_space_dp) > max_w_dp
     except Exception:
-        last_chars = len(last_paragraph) % 26
+        last_chars = len(last_paragraph) % 28
         if last_chars == 0 and len(last_paragraph) > 0:
-            last_chars = 26
+            last_chars = 28
         return last_chars > 20
+
+
+def extract_photo_attachments(attachments: list) -> list:
+    """Extracts list of { 'url': str, 'width': int, 'height': int, 'aspect_ratio': float } from message attachments."""
+    if not attachments or not isinstance(attachments, list):
+        return []
+    photos = []
+    for att in attachments:
+        if not isinstance(att, dict) or att.get("type") != "photo":
+            continue
+        p = att.get("photo")
+        if not isinstance(p, dict):
+            continue
+        sizes = p.get("sizes", [])
+        if not sizes:
+            continue
+        # Find optimal size for display (width between 360 and 1080)
+        sorted_sizes = sorted(sizes, key=lambda s: s.get("width", 0))
+        best = None
+        for s in sorted_sizes:
+            if s.get("width", 0) >= 360:
+                best = s
+                break
+        if not best:
+            best = sorted_sizes[-1]
+        url = best.get("url", "")
+        w = best.get("width", 0) or 600
+        h = best.get("height", 0) or 400
+        if url:
+            aspect = max(0.4, min(2.5, (w / h) if h > 0 else 1.33))
+            photos.append({
+                "url": url,
+                "width": w,
+                "height": h,
+                "aspect_ratio": aspect
+            })
+    return photos
+
+
+def estimate_photos_height(photos: list, container_width: float = 240.0) -> int:
+    """Estimates the render height in dp for a given list of photo attachments."""
+    if not photos:
+        return 0
+    n = len(photos)
+    if n == 1:
+        ar = photos[0].get("aspect_ratio", 1.33)
+        h = container_width / ar
+        return int(max(120, min(260, h)))
+    elif n == 2:
+        return 140
+    elif n == 3:
+        return 215
+    elif n == 4:
+        return 200
+    else:
+        rows = (n + 2) // 3
+        return int(rows * 85)
 
 
 def estimate_message_height(
@@ -206,24 +277,43 @@ def estimate_message_height(
     has_reply: bool = False,
     fwd_count: int = 0,
     fwd_texts: list = None,
-    time_needs_own_line: Optional[bool] = None
+    time_needs_own_line: Optional[bool] = None,
+    photos: Optional[list] = None
 ) -> int:
     """
     Accurately calculates message bubble height in dp to eliminate RecycleView layout dancing
     and ensure proper spacing between messages even on large text blocks.
     """
-    if time_needs_own_line is None:
-        time_needs_own_line = check_time_needs_own_line(text, is_outgoing=not has_sender_name)
+    clean_text = clean_message_text(text)
+    has_text = bool(clean_text.strip())
+    has_photos = bool(photos)
 
-    base_padding = 22  # content_box padding (8) + bubble row padding (4) + safety margin (10)
+    if time_needs_own_line is None:
+        time_needs_own_line = check_time_needs_own_line(clean_text, is_outgoing=not has_sender_name) if has_text else False
+
+    # Minimal padding for photo-only bubble
+    if has_photos and not has_text and not has_sender_name:
+        base_padding = 8
+    else:
+        base_padding = 10  # content_box vertical padding (8) + bubble_row padding (2)
+
     if has_sender_name:
         base_padding += 17  # Sender name header (15) + spacing (2)
 
     if has_reply:
         base_padding += 38  # Reply preview box (36) + spacing (2)
 
-    if time_needs_own_line:
-        base_padding += 13  # Extra line for timestamp only when text is too wide to share line
+    if has_photos:
+        base_padding += estimate_photos_height(photos)
+        if has_text:
+            base_padding += 4  # Spacing between photos and text
+
+    if has_text:
+        if time_needs_own_line:
+            base_padding += 13  # Extra line for timestamp only when text is too wide to share line
+        text_height = _measure_text_height(clean_text, font_size_sp=15)
+    else:
+        text_height = 0
 
     fwd_extra = 0
     if fwd_count > 0:
@@ -233,9 +323,8 @@ def estimate_message_height(
                 if ft:
                     fwd_extra += _measure_text_height(ft, font_size_sp=14)
 
-    text_height = _measure_text_height(text, font_size_sp=15) if text else 0
     total = base_padding + text_height + fwd_extra
-    return max(42, int(total))
+    return max(36, int(total))
 
 
 

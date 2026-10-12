@@ -7,8 +7,44 @@ from kivy.graphics import Color, RoundedRectangle
 from kivy.properties import StringProperty, BooleanProperty, NumericProperty, ListProperty, DictProperty
 from kivy.metrics import dp
 from kivymd.app import MDApp
+from kivy.uix.relativelayout import RelativeLayout
 from src.core.constants import ScreenName
 from src.ui.components.avatar import CircularAvatar
+from src.data.cache.media_cache import media_cache
+
+
+class PhotoItem(RelativeLayout):
+    """Single photo thumbnail with cached loading, rounded corners, and optional floating timestamp badge."""
+    url = StringProperty("")
+    local_source = StringProperty("")
+    radius = ListProperty([dp(12), dp(12), dp(12), dp(12)])
+    time_text = StringProperty("")
+    is_outgoing = BooleanProperty(False)
+    is_read = BooleanProperty(True)
+    show_time_badge = BooleanProperty(False)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.bind(url=self._on_url)
+        if self.url:
+            self._load()
+
+    def _on_url(self, instance, value):
+        self._load()
+
+    def _load(self):
+        if not self.url:
+            self.local_source = ""
+            return
+        local = media_cache.get_local_path(self.url)
+        if local:
+            self.local_source = local
+        else:
+            self.local_source = ""
+            def _on_ready(path, target_url=self.url):
+                if path and self.url == target_url:
+                    self.local_source = path
+            media_cache.fetch_image_async(self.url, on_ready=_on_ready)
 
 
 class ForwardedMessageItem(BoxLayout):
@@ -28,6 +64,7 @@ class MessageBubble(RecycleDataViewBehavior, BoxLayout):
 
     index = None
     text = StringProperty("")
+    photos = ListProperty([])
     sender_name = StringProperty("")
     sender_avatar = StringProperty("")
     sender_impact_style = StringProperty("")
@@ -56,11 +93,120 @@ class MessageBubble(RecycleDataViewBehavior, BoxLayout):
         self._is_swiping = False
         super().refresh_view_attrs(rv, index, data)
         self.time_needs_own_line = bool(data.get("time_needs_own_line", False))
+        self.photos = data.get("photos", [])
         self.update_colors()
+        self.rebuild_photos(self.photos)
         self.rebuild_fwd_messages(data.get("fwd_messages", []))
         av_w = self.ids.get("avatar_widget")
         if av_w and av_w.source:
             av_w.reload_avatar_if_needed()
+
+    def on_photos(self, instance, value):
+        self.rebuild_photos(value)
+
+    def rebuild_photos(self, photos):
+        container = self.ids.get("photos_container")
+        if not container:
+            return
+        container.clear_widgets()
+        if not photos or not isinstance(photos, list):
+            return
+
+        has_text = bool(self.text and self.text.strip())
+        show_time_badge = (not has_text) and (not bool(self.fwd_messages))
+        bubble_radius = [dp(16), dp(16), dp(4) if self.is_outgoing else dp(16), dp(16) if self.is_outgoing else dp(4)]
+
+        from src.utils.formatters import estimate_photos_height
+        n = len(photos)
+
+        if n == 1:
+            p = photos[0]
+            item_h = estimate_photos_height([p])
+            item = PhotoItem(
+                url=p.get("url", ""),
+                size_hint=(1, None),
+                height=dp(item_h),
+                radius=bubble_radius if (not has_text and not self.sender_name) else [dp(12), dp(12), dp(12), dp(12)],
+                time_text=self.time_text,
+                is_outgoing=self.is_outgoing,
+                is_read=self.is_read,
+                show_time_badge=show_time_badge
+            )
+            container.add_widget(item)
+
+        elif n == 2:
+            row = BoxLayout(orientation="horizontal", spacing=dp(3), size_hint=(1, None), height=dp(140))
+            p1 = PhotoItem(url=photos[0].get("url", ""), size_hint=(0.5, 1), radius=[dp(12), dp(12), dp(12), dp(12)])
+            p2 = PhotoItem(
+                url=photos[1].get("url", ""),
+                size_hint=(0.5, 1),
+                radius=[dp(12), dp(12), dp(12), dp(12)],
+                time_text=self.time_text,
+                is_outgoing=self.is_outgoing,
+                is_read=self.is_read,
+                show_time_badge=show_time_badge
+            )
+            row.add_widget(p1)
+            row.add_widget(p2)
+            container.add_widget(row)
+
+        elif n == 3:
+            p1 = PhotoItem(url=photos[0].get("url", ""), size_hint=(1, None), height=dp(125), radius=[dp(12), dp(12), dp(12), dp(12)])
+            container.add_widget(p1)
+            row2 = BoxLayout(orientation="horizontal", spacing=dp(3), size_hint=(1, None), height=dp(95))
+            p2 = PhotoItem(url=photos[1].get("url", ""), size_hint=(0.5, 1), radius=[dp(12), dp(12), dp(12), dp(12)])
+            p3 = PhotoItem(
+                url=photos[2].get("url", ""),
+                size_hint=(0.5, 1),
+                radius=[dp(12), dp(12), dp(12), dp(12)],
+                time_text=self.time_text,
+                is_outgoing=self.is_outgoing,
+                is_read=self.is_read,
+                show_time_badge=show_time_badge
+            )
+            row2.add_widget(p2)
+            row2.add_widget(p3)
+            container.add_widget(row2)
+
+        elif n == 4:
+            row1 = BoxLayout(orientation="horizontal", spacing=dp(3), size_hint=(1, None), height=dp(100))
+            row1.add_widget(PhotoItem(url=photos[0].get("url", ""), size_hint=(0.5, 1), radius=[dp(10), dp(10), dp(10), dp(10)]))
+            row1.add_widget(PhotoItem(url=photos[1].get("url", ""), size_hint=(0.5, 1), radius=[dp(10), dp(10), dp(10), dp(10)]))
+            container.add_widget(row1)
+
+            row2 = BoxLayout(orientation="horizontal", spacing=dp(3), size_hint=(1, None), height=dp(100))
+            row2.add_widget(PhotoItem(url=photos[2].get("url", ""), size_hint=(0.5, 1), radius=[dp(10), dp(10), dp(10), dp(10)]))
+            row2.add_widget(PhotoItem(
+                url=photos[3].get("url", ""),
+                size_hint=(0.5, 1),
+                radius=[dp(10), dp(10), dp(10), dp(10)],
+                time_text=self.time_text,
+                is_outgoing=self.is_outgoing,
+                is_read=self.is_read,
+                show_time_badge=show_time_badge
+            ))
+            container.add_widget(row2)
+
+        else:
+            chunk_size = 3 if n >= 6 else 2
+            idx = 0
+            while idx < n:
+                chunk = photos[idx:idx + chunk_size]
+                row = BoxLayout(orientation="horizontal", spacing=dp(3), size_hint=(1, None), height=dp(85))
+                for c_i, p_item in enumerate(chunk):
+                    is_last = (idx + c_i == n - 1)
+                    pi = PhotoItem(
+                        url=p_item.get("url", ""),
+                        size_hint=(1.0 / len(chunk), 1),
+                        radius=[dp(8), dp(8), dp(8), dp(8)],
+                        time_text=self.time_text if is_last else "",
+                        is_outgoing=self.is_outgoing if is_last else False,
+                        is_read=self.is_read if is_last else True,
+                        show_time_badge=show_time_badge if is_last else False
+                    )
+                    row.add_widget(pi)
+                container.add_widget(row)
+                idx += chunk_size
 
     def on_text(self, instance, value):
         from src.utils.formatters import check_time_needs_own_line

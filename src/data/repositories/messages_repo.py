@@ -114,6 +114,86 @@ class MessagesRepository:
             except Exception:
                 pass
 
+        # Collect any missing user or group IDs from items, replies, and forwards
+        missing_uids = set()
+        missing_gids = set()
+        for item in items:
+            fid = item.get("from_id") or item.get("author_id", 0)
+            if fid:
+                if fid > 0 and fid not in profiles:
+                    missing_uids.add(fid)
+                elif fid < 0 and abs(fid) not in groups:
+                    missing_gids.add(abs(fid))
+            rep = item.get("reply_message")
+            if rep and isinstance(rep, dict):
+                rfid = rep.get("from_id", 0)
+                if rfid:
+                    if rfid > 0 and rfid not in profiles:
+                        missing_uids.add(rfid)
+                    elif rfid < 0 and abs(rfid) not in groups:
+                        missing_gids.add(abs(rfid))
+            for fwd in (item.get("fwd_messages", []) or []):
+                if isinstance(fwd, dict):
+                    ffid = fwd.get("from_id", 0)
+                    if ffid:
+                        if ffid > 0 and ffid not in profiles:
+                            missing_uids.add(ffid)
+                        elif ffid < 0 and abs(ffid) not in groups:
+                            missing_gids.add(abs(ffid))
+
+        # 1. Resolve missing users from memory cache
+        still_missing_uids = set()
+        for uid in missing_uids:
+            if uid in users_repo._memory_cache:
+                u = users_repo._memory_cache[uid]
+                profiles[uid] = {
+                    "name": f"{u.get('first_name', '')} {u.get('last_name', '')}".strip() or "Пользователь",
+                    "avatar": u.get("photo_100") or u.get("photo_200") or ""
+                }
+            else:
+                still_missing_uids.add(uid)
+
+        # 2. Resolve missing users from SQLite cache
+        if still_missing_uids:
+            found_in_db = set()
+            for uid in list(still_missing_uids):
+                db_u = await db_manager.get_cached_user(uid)
+                if db_u:
+                    users_repo._memory_cache[uid] = db_u
+                    profiles[uid] = {
+                        "name": f"{db_u.get('first_name', '')} {db_u.get('last_name', '')}".strip() or "Пользователь",
+                        "avatar": db_u.get("photo_100") or db_u.get("photo_200") or ""
+                    }
+                    found_in_db.add(uid)
+            still_missing_uids -= found_in_db
+
+        # 3. Batch fetch remaining missing users from VK API
+        if still_missing_uids:
+            try:
+                fetched_users = await api_client.users_get(user_ids=list(still_missing_uids))
+                new_users_to_save = []
+                for u in fetched_users:
+                    profiles[u.id] = {
+                        "name": u.full_name or "Пользователь",
+                        "avatar": u.avatar_url
+                    }
+                    u_dict = {
+                        "id": u.id,
+                        "first_name": u.first_name,
+                        "last_name": u.last_name,
+                        "photo_100": u.photo_100 or "",
+                        "photo_200": u.photo_200 or "",
+                        "online": int(u.online),
+                        "impact_style": u.impact_style,
+                        "updated_at": int(time.time())
+                    }
+                    users_repo._memory_cache[u.id] = u_dict
+                    new_users_to_save.append(u_dict)
+                if new_users_to_save:
+                    await db_manager.save_cached_users(new_users_to_save)
+            except Exception as e_fetch:
+                logger.warning("Failed batch fetching missing users %s: %s", still_missing_uids, e_fetch)
+
         # Fallback to dialog title and avatar for channels
         chat_title, chat_avatar = "", ""
         try:
@@ -144,6 +224,13 @@ class MessagesRepository:
             if from_id > 0 and from_id in profiles:
                 m.sender_name = profiles[from_id]["name"]
                 m.sender_avatar = profiles[from_id]["avatar"]
+            elif from_id > 0:
+                cached_u = users_repo._memory_cache.get(from_id)
+                if cached_u:
+                    fn = cached_u.get("first_name", "")
+                    ln = cached_u.get("last_name", "")
+                    m.sender_name = f"{fn} {ln}".strip() or "Пользователь"
+                    m.sender_avatar = cached_u.get("photo_100") or cached_u.get("photo_200") or ""
             elif from_id < 0 and abs(from_id) in groups:
                 m.sender_name = groups[abs(from_id)]["name"]
                 m.sender_avatar = groups[abs(from_id)]["avatar"]
