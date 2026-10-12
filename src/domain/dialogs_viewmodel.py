@@ -9,7 +9,7 @@ from src.data.repositories.users_repo import users_repo
 from src.data.api.models import VKDialogItem
 from src.core.events import event_bus
 from src.core.constants import EventType
-from src.utils.formatters import format_timestamp, truncate_text, get_user_initials, format_unread_count
+from src.utils.formatters import format_timestamp, truncate_text, get_user_initials, format_unread_count, format_fallback_attachment_text
 from src.utils.async_tools import run_async
 from src.core.logger import logger
 from src.data.api.client import api_client
@@ -547,7 +547,7 @@ class DialogsViewModel(BaseViewModel):
             is_archived = target_item.is_archived or self._peer_archive_status.get(peer_id, False)
 
         # 3. Format message text
-        formatted_text = text or ("[Вложение]" if attachments else "")
+        formatted_text = text or format_fallback_attachment_text(attachments, include_photo=True) or ("[Вложение]" if attachments else "")
         if is_out:
             target_item.last_message_text = f"Вы: {formatted_text}"
         else:

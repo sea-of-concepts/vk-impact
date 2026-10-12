@@ -80,3 +80,81 @@
                             halign: "left"
                             valign: "middle"
                             text_size: (self.width, None)
+
+                # Card 2: Cache Management
+                BoxLayout:
+                    orientation: "vertical"
+                    size_hint_y: None
+                    height: self.minimum_height
+                    padding: [dp(16), dp(16)]
+                    spacing: dp(12)
+                    canvas.before:
+                        Color:
+                            rgba: app.card_bg
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [dp(16)]
+
+                    BoxLayout:
+                        orientation: "horizontal"
+                        size_hint_y: None
+                        height: dp(42)
+                        spacing: dp(14)
+
+                        MDIcon:
+                            icon: "database-outline"
+                            theme_icon_color: "Custom"
+                            icon_color: app.accent_color
+                            size_hint: (None, None)
+                            size: (dp(26), dp(26))
+                            pos_hint: {"center_y": 0.5}
+
+                        BoxLayout:
+                            orientation: "vertical"
+                            spacing: dp(2)
+                            pos_hint: {"center_y": 0.5}
+
+                            Label:
+                                text: "Память и данные"
+                                bold: True
+                                font_size: "15sp"
+                                color: app.text_color
+                                halign: "left"
+                                valign: "middle"
+                                text_size: (self.width, None)
+
+                            Label:
+                                text: "Кэш сообщений: " + root.cache_size_str
+                                font_size: "13sp"
+                                color: app.secondary_text_color
+                                halign: "left"
+                                valign: "middle"
+                                text_size: (self.width, None)
+
+                    # Action Button: Очистить кэш сообщений
+                    MDButton:
+                        style: "tonal"
+                        size_hint_x: 1
+                        size_hint_y: None
+                        height: dp(44)
+                        disabled: root.is_clearing
+                        on_release: root.clear_message_cache()
+
+                        MDButtonIcon:
+                            icon: "delete-sweep-outline"
+
+                        MDButtonText:
+                            text: "Очистить кэш сообщений (" + root.cache_size_str + ")"
+                            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+                    # Status feedback label
+                    Label:
+                        text: root.clear_status_message
+                        font_size: "12sp"
+                        color: (0.22, 0.82, 0.38, 1) if root.clear_status_message and "успешно" in root.clear_status_message else app.secondary_text_color
+                        halign: "center"
+                        valign: "middle"
+                        size_hint_y: None
+                        height: dp(18) if root.clear_status_message else 0
+                        opacity: 1 if root.clear_status_message else 0

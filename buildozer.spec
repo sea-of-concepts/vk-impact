@@ -28,7 +28,7 @@ source.exclude_dirs = tests,bin,.pytest_cache,__pycache__,.git,.github,.venv,env
 # source.exclude_patterns = 
 
 # (str) Application versioning (method 1)
-version = 1.1
+version = 1.2
 
 # (str) Application versioning (method 2)
 # version.regex = __version__ = ['"](.*)['"]

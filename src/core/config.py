@@ -49,7 +49,7 @@ def _get_default_base_dir() -> Path:
 class AppConfig:
     """Global configuration settings for VK_IMPACT."""
     APP_NAME: str = "VK_IMPACT"
-    VERSION: str = "0.1.0"
+    VERSION: str = "1.2"
     
     # VK API Settings
     VK_API_VERSION: str = "5.199"

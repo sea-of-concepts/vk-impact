@@ -126,6 +126,7 @@ class MessageBubble(RecycleDataViewBehavior, BoxLayout):
         av_w = self.ids.get("avatar_widget")
         if av_w and av_w.source:
             av_w.reload_avatar_if_needed()
+        Clock.schedule_once(self._sync_rendered_height, 0)
 
     def update_display_text(self):
         if not self.text:
@@ -135,11 +136,13 @@ class MessageBubble(RecycleDataViewBehavior, BoxLayout):
 
     def _sync_rendered_height(self, dt=0):
         c_box = self.ids.get("content_box")
-        if not c_box:
+        if not c_box or not self.rv or self.index is None:
             return
         real_h = c_box.minimum_height + (dp(28) if self.show_new_divider else 0) + dp(4)
-        if real_h > dp(24) and abs(self.height - real_h) > dp(6):
+        if real_h > dp(24) and (real_h - self.height) > dp(10):
             self.height = real_h
+            if self.rv.data and self.index < len(self.rv.data):
+                self.rv.data[self.index]["msg_size"] = [None, real_h]
 
     def on_photos(self, instance, value):
         self.rebuild_photos(value)

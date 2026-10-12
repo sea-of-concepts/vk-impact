@@ -347,11 +347,11 @@ class ChatViewModel(BaseViewModel):
         # Clear input field immediately
         self.input_text = ""
         now = int(time.time())
+        temp_id = -now
 
         # Optimistically add message to current chat UI immediately
-        temp_id = -now
-        time_needs_own = check_time_needs_own_line(text, is_outgoing=True)
-        height = estimate_message_height(text, has_sender_name=False, has_reply=bool(reply_preview), time_needs_own_line=time_needs_own)
+        is_grp = (self.peer_id >= 2000000000 or self.peer_id < 0)
+        time_needs_own = check_time_needs_own_line(text, is_outgoing=True, is_group_chat=is_grp)
         bw = estimate_bubble_width(
             text=text,
             photos=[],
@@ -360,7 +360,14 @@ class ChatViewModel(BaseViewModel):
             has_fwd=False,
             time_needs_own_line=time_needs_own,
             is_outgoing=True,
-            is_group_chat=(self.peer_id >= 2000000000 or self.peer_id < 0)
+            is_group_chat=is_grp
+        )
+        height = estimate_message_height(
+            text,
+            has_sender_name=False,
+            has_reply=bool(reply_preview),
+            time_needs_own_line=time_needs_own,
+            bubble_w=bw
         )
         opt_item = {
             "message_id": temp_id,
@@ -488,15 +495,6 @@ class ChatViewModel(BaseViewModel):
                             fwds = m_copy.get("fwd_messages", [])
                             fwd_texts = [f.get("text", "") for f in fwds if isinstance(f, dict)]
                             photos = m_copy.get("photos", [])
-                            h = estimate_message_height(
-                                t,
-                                has_sender_name=True,
-                                has_reply=bool(reply),
-                                fwd_count=len(fwds),
-                                fwd_texts=fwd_texts,
-                                time_needs_own_line=time_needs_own,
-                                photos=photos
-                            )
                             bw = estimate_bubble_width(
                                 text=t,
                                 photos=photos,
@@ -506,6 +504,16 @@ class ChatViewModel(BaseViewModel):
                                 time_needs_own_line=time_needs_own,
                                 is_outgoing=False,
                                 is_group_chat=m_copy.get("is_group_chat", False)
+                            )
+                            h = estimate_message_height(
+                                t,
+                                has_sender_name=True,
+                                has_reply=bool(reply),
+                                fwd_count=len(fwds),
+                                fwd_texts=fwd_texts,
+                                time_needs_own_line=time_needs_own,
+                                photos=photos,
+                                bubble_w=bw
                             )
                             m_copy["bubble_width"] = dp(bw)
                             m_copy["msg_size"] = [None, dp(h)]
@@ -559,18 +567,8 @@ class ChatViewModel(BaseViewModel):
                 _collect_texts(fwds)
 
             has_text = bool(raw_text.strip())
-            time_needs_own = check_time_needs_own_line(raw_text, m.is_outgoing) if has_text else False
-            base_height = estimate_message_height(
-                raw_text,
-                has_sender_name=has_sender,
-                has_reply=bool(reply),
-                fwd_count=max(len(fwds), len(fwd_texts)),
-                fwd_texts=fwd_texts,
-                time_needs_own_line=time_needs_own,
-                photos=photos
-            )
-            total_height = base_height + (28 if is_first_unread else 0)
-
+            is_grp = (self.peer_id >= 2000000000 or self.peer_id < 0)
+            time_needs_own = check_time_needs_own_line(raw_text, m.is_outgoing, is_group_chat=is_grp, sender_name=sender_name) if has_text else False
             bubble_w = estimate_bubble_width(
                 text=raw_text,
                 photos=photos,
@@ -579,8 +577,19 @@ class ChatViewModel(BaseViewModel):
                 has_fwd=bool(fwds),
                 time_needs_own_line=time_needs_own,
                 is_outgoing=m.is_outgoing,
-                is_group_chat=(self.peer_id >= 2000000000 or self.peer_id < 0)
+                is_group_chat=is_grp
             )
+            base_height = estimate_message_height(
+                raw_text,
+                has_sender_name=has_sender,
+                has_reply=bool(reply),
+                fwd_count=max(len(fwds), len(fwd_texts)),
+                fwd_texts=fwd_texts,
+                time_needs_own_line=time_needs_own,
+                photos=photos,
+                bubble_w=bubble_w
+            )
+            total_height = base_height + (28 if is_first_unread else 0)
 
             sender_style = ""
             if not m.is_outgoing:
@@ -591,7 +600,7 @@ class ChatViewModel(BaseViewModel):
                 "message_id": m.id,
                 "from_id": m.from_id,
                 "date": getattr(m, "date", 0),
-                "is_group_chat": (self.peer_id >= 2000000000 or self.peer_id < 0),
+                "is_group_chat": (self.peer_id >= 2000000000 or self.peer_id < 0 or getattr(m, "peer_id", 0) >= 2000000000 or getattr(m, "peer_id", 0) < 0),
                 "text": raw_text,
                 "photos": photos,
                 "full_sender_name": sender_name,
@@ -647,7 +656,7 @@ class ChatViewModel(BaseViewModel):
         if not messages:
             return messages
 
-        is_group = bool(self.peer_id >= 2000000000 or self.peer_id < 0)
+        is_group = bool(self.peer_id >= 2000000000 or self.peer_id < 0 or (messages[0].get("is_group_chat", False) if messages else False))
         n = len(messages)
 
         for i in range(n):
@@ -719,7 +728,8 @@ class ChatViewModel(BaseViewModel):
                     fwd_count=len(fwds),
                     fwd_texts=fwd_texts,
                     time_needs_own_line=time_own,
-                    photos=photos
+                    photos=photos,
+                    bubble_w=bw
                 )
                 curr["msg_size"] = [None, dp(h + (28 if curr.get("show_new_divider") else 0))]
 
@@ -934,64 +944,108 @@ class ChatViewModel(BaseViewModel):
         fwd_texts = [f.get("text", "") for f in fwds if isinstance(f, dict)]
 
         raw_attachments = kwargs.get("attachments") or []
+        cmid = kwargs.get("conversation_message_id", 0)
         photos = []
+        photo_ids_from_dict = []
+
         if isinstance(raw_attachments, list):
             photos = extract_photo_attachments(raw_attachments)
         elif isinstance(raw_attachments, dict) and any(k.startswith("attach") for k in raw_attachments):
+            # Parse photo IDs from compact dict e.g. attach1_type == 'photo', attach1 == '708902696_457257321'
+            for k, v in raw_attachments.items():
+                if k.endswith("_type") and v == "photo":
+                    p_key = k[:-5]
+                    p_val = raw_attachments.get(p_key)
+                    if p_val:
+                        photo_ids_from_dict.append(str(p_val))
+
+            if photo_ids_from_dict:
+                cnt = max(1, len(photo_ids_from_dict))
+                # Initial placeholder photos for instant layout calculation & rendering
+                photos = [{"url": "", "aspect_ratio": 1.33, "loading": True} for _ in range(cnt)]
+
             # LongPoll compact attachment dictionary: fetch full message to get photo sizes/URLs
-            async def _fetch_full_attachments(mid: int):
+            async def _fetch_full_attachments(mid: int, c_mid: int):
                 try:
-                    res = await api_client.request("messages.getById", {"message_ids": mid})
-                    full_items = res.get("items", [])
+                    res = None
+                    if c_mid and (self.peer_id >= 2000000000 or self.peer_id < 0):
+                        try:
+                            res = await api_client.request(
+                                "messages.getByConversationMessageId",
+                                {"peer_id": self.peer_id, "conversation_message_ids": c_mid, "extended": 1}
+                            )
+                        except Exception as e_cmid:
+                            logger.debug("messages.getByConversationMessageId failed: %s", e_cmid)
+
+                    if not res or not res.get("items"):
+                        try:
+                            res = await api_client.request("messages.getById", {"message_ids": mid, "extended": 1})
+                        except Exception as e_mid:
+                            logger.debug("messages.getById failed: %s", e_mid)
+
+                    fetched_photos = []
+                    full_items = res.get("items", []) if res else []
                     if full_items:
                         full_att = full_items[0].get("attachments", [])
                         fetched_photos = extract_photo_attachments(full_att)
-                        if fetched_photos:
-                            def _apply_photos(dt):
-                                for m in self.messages:
-                                    if m.get("message_id") == mid:
-                                        m["photos"] = fetched_photos
-                                        h = estimate_message_height(
-                                            m.get("text", ""),
-                                            has_sender_name=bool(m.get("sender_name") and not m.get("is_outgoing")),
-                                            has_reply=bool(m.get("reply_message")),
-                                            fwd_count=len(m.get("fwd_messages", [])),
-                                            photos=fetched_photos
-                                        )
-                                        bw = estimate_bubble_width(
-                                            text=m.get("text", ""),
-                                            photos=fetched_photos,
-                                            sender_name=m.get("sender_name", ""),
-                                            has_reply=bool(m.get("reply_message")),
-                                            has_fwd=bool(m.get("fwd_messages")),
-                                            time_needs_own_line=m.get("time_needs_own_line", False),
-                                            is_outgoing=m.get("is_outgoing", False),
-                                            is_group_chat=m.get("is_group_chat", False)
-                                        )
-                                        m["bubble_width"] = dp(bw)
-                                        m["msg_size"] = [None, dp(h)]
-                                        break
-                                self.messages = list(self.messages)
-                            Clock.schedule_once(_apply_photos, 0)
+
+                    # Fallback: fetch directly via photos.getById if we have photo IDs
+                    if not fetched_photos and photo_ids_from_dict:
+                        try:
+                            p_res = await api_client.request("photos.getById", {"photos": ",".join(photo_ids_from_dict)})
+                            p_items = p_res if isinstance(p_res, list) else p_res.get("items", [])
+                            if p_items:
+                                fetched_photos = extract_photo_attachments([{"type": "photo", "photo": p} for p in p_items])
+                        except Exception as e_p:
+                            logger.debug("photos.getById fallback failed: %s", e_p)
+
+                    if fetched_photos:
+                        def _apply_photos(dt):
+                            updated = []
+                            changed = False
+                            for m in self.messages:
+                                if m.get("message_id") == mid:
+                                    m_new = dict(m)
+                                    m_new["photos"] = fetched_photos
+                                    bw = estimate_bubble_width(
+                                        text=m_new.get("text", ""),
+                                        photos=fetched_photos,
+                                        sender_name=m_new.get("sender_name", ""),
+                                        has_reply=bool(m_new.get("reply_message")),
+                                        has_fwd=bool(m_new.get("fwd_messages")),
+                                        time_needs_own_line=m_new.get("time_needs_own_line", False),
+                                        is_outgoing=m_new.get("is_outgoing", False),
+                                        is_group_chat=m_new.get("is_group_chat", False)
+                                    )
+                                    h = estimate_message_height(
+                                        m_new.get("text", ""),
+                                        has_sender_name=bool(m_new.get("sender_name") and not m_new.get("is_outgoing")),
+                                        has_reply=bool(m_new.get("reply_message")),
+                                        fwd_count=len(m_new.get("fwd_messages", [])),
+                                        photos=fetched_photos,
+                                        bubble_w=bw
+                                    )
+                                    m_new["bubble_width"] = dp(bw)
+                                    m_new["msg_size"] = [None, dp(h)]
+                                    updated.append(m_new)
+                                    changed = True
+                                else:
+                                    updated.append(m)
+                            if changed:
+                                self.messages = updated
+                                self.property("messages").dispatch(self)
+                        Clock.schedule_once(_apply_photos, 0)
                 except Exception as e_att:
                     logger.debug("Failed fetching full attachments for %s: %s", mid, e_att)
-            run_async(_fetch_full_attachments(message_id))
+            run_async(_fetch_full_attachments(message_id, cmid))
 
         clean_text = clean_message_text(text)
         if not clean_text and not photos and raw_attachments:
-            clean_text = format_fallback_attachment_text(raw_attachments if isinstance(raw_attachments, list) else [])
+            clean_text = format_fallback_attachment_text(raw_attachments, include_photo=False)
         has_text = bool(clean_text.strip())
         has_sender = bool(sender_name and not is_out)
-        time_needs_own = check_time_needs_own_line(clean_text, is_out) if has_text else False
-        height = estimate_message_height(
-            clean_text,
-            has_sender_name=has_sender,
-            has_reply=bool(reply),
-            fwd_count=len(fwds),
-            fwd_texts=fwd_texts,
-            time_needs_own_line=time_needs_own,
-            photos=photos
-        )
+        is_grp = (self.peer_id >= 2000000000 or self.peer_id < 0)
+        time_needs_own = check_time_needs_own_line(clean_text, is_out, is_group_chat=is_grp, sender_name=sender_name) if has_text else False
         bw = estimate_bubble_width(
             text=clean_text,
             photos=photos,
@@ -1000,7 +1054,17 @@ class ChatViewModel(BaseViewModel):
             has_fwd=bool(fwds),
             time_needs_own_line=time_needs_own,
             is_outgoing=is_out,
-            is_group_chat=(self.peer_id >= 2000000000 or self.peer_id < 0)
+            is_group_chat=is_grp
+        )
+        height = estimate_message_height(
+            clean_text,
+            has_sender_name=has_sender,
+            has_reply=bool(reply),
+            fwd_count=len(fwds),
+            fwd_texts=fwd_texts,
+            time_needs_own_line=time_needs_own,
+            photos=photos,
+            bubble_w=bw
         )
 
         new_item = {

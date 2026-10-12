@@ -26,3 +26,9 @@ dist/
 !buildozer.spec
 .buildozer/
 bin/
+
+# Temporary logs, inspector scripts and user uploads
+*.log
+*.mp4
+inspect_output/
+scripts/

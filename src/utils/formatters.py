@@ -132,19 +132,45 @@ def clean_message_text(text: str) -> str:
     return html.unescape(cleaned)
 
 
-def _measure_text_height(text: str, font_size_sp: int = 15, is_outgoing: bool = False) -> int:
+def get_screen_width_dp() -> float:
+    """Returns reliable viewport width in dp for mobile and desktop."""
+    try:
+        from kivy.core.window import Window
+        from kivy.metrics import dp
+        from kivy.utils import platform
+        is_mobile = platform in ("android", "ios")
+        if Window and getattr(Window, "width", 0) > 0:
+            w_dp = Window.width / dp(1)
+            # 800 is Kivy's uninitialized default SDL window width
+            if 300 <= w_dp <= 560 and abs(w_dp - 800) > 5:
+                return w_dp
+            return 392.0 if is_mobile else 420.0
+    except Exception:
+        pass
+    return 392.0
+
+
+def _measure_text_height(
+    text: str,
+    font_size_sp: int = 15,
+    is_outgoing: bool = False,
+    bubble_w: Optional[int] = None
+) -> int:
     """Measures exact rendered text height in dp matching Kivy Label word-wrapping."""
     if not text:
         return 0
     clean_text = clean_message_text(text)
+    if not clean_text:
+        return 0
+
+    if bubble_w is None:
+        bubble_w = estimate_bubble_width(clean_text, is_outgoing=is_outgoing)
+    bubble_text_w = max(40, bubble_w - 24)
+
     try:
         from kivy.core.text import Label as CoreLabel
-        from kivy.core.window import Window
         from kivy.metrics import dp, sp
 
-        win_w = Window.width / dp(1) if (Window and getattr(Window, "width", 0) > 0) else 380
-        avail_w = win_w - 16 - (38 if not is_outgoing else 0)
-        bubble_text_w = max(160, int(avail_w * 0.85)) - 24
         core = CoreLabel(text=clean_text, font_size=sp(font_size_sp), text_size=(dp(bubble_text_w), None))
         core.refresh()
         if core.texture and core.texture.size[1] > 0:
@@ -153,7 +179,8 @@ def _measure_text_height(text: str, font_size_sp: int = 15, is_outgoing: bool = 
         pass
 
     # Thread-safe accurate fallback matching Kivy Label's 15sp line height (18dp)
-    limit = 38 if is_outgoing else 33
+    char_w = 7.8 * (font_size_sp / 15.0)
+    limit = max(10, int(bubble_text_w / char_w))
     total_lines = 0
     for para in clean_text.split("\n"):
         if not para:
@@ -192,7 +219,13 @@ def get_text_width_dp(text: str, font_size_sp: int = 15, bold: bool = False) -> 
     return len(text) * (char_factor * (font_size_sp / 15.0))
 
 
-def check_time_needs_own_line(text: str, is_outgoing: bool = False, max_w_dp: Optional[float] = None) -> bool:
+def check_time_needs_own_line(
+    text: str,
+    is_outgoing: bool = False,
+    max_w_dp: Optional[float] = None,
+    is_group_chat: bool = False,
+    sender_name: str = ""
+) -> bool:
     """
     Returns True if the last line of text is too wide to fit the timestamp inline,
     requiring a separate row below the text.
@@ -209,14 +242,11 @@ def check_time_needs_own_line(text: str, is_outgoing: bool = False, max_w_dp: Op
         return False
 
     if max_w_dp is None:
-        try:
-            from kivy.core.window import Window
-            from kivy.metrics import dp
-            win_w = Window.width / dp(1) if (Window and getattr(Window, "width", 0) > 0) else 380
-        except Exception:
-            win_w = 380
-        avatar_space = 38 if not is_outgoing else 0
-        max_w_dp = (win_w - 16 - avatar_space) * 0.85 - 24
+        win_w = get_screen_width_dp()
+        avatar_space = 38 if (not is_outgoing and (is_group_chat or sender_name)) else 0
+        avail_w = win_w - 24 - avatar_space
+        max_bubble_w = max(160, int(avail_w - 4))
+        max_w_dp = max_bubble_w - 24
 
     # If single-line message: check directly if text + timestamp fits inside max_w_dp!
     if len(lines) == 1:
@@ -255,7 +285,8 @@ def check_time_needs_own_line(text: str, is_outgoing: bool = False, max_w_dp: Op
         return (last_w_dp + time_space_dp) > max_w_dp
     except Exception:
         # Thread-safe character-based fallback with word boundary tracking
-        limit = 38 if is_outgoing else 33
+        char_w = 7.8
+        limit = max(10, int(max_w_dp / char_w))
         time_chars = 8 if is_outgoing else 6
         cur = 0
         for w in words:
@@ -269,32 +300,63 @@ def check_time_needs_own_line(text: str, is_outgoing: bool = False, max_w_dp: Op
         return (cur + time_chars) > limit
 
 
-def format_fallback_attachment_text(attachments: list) -> str:
-    """Returns readable fallback badge text for non-photo attachments if message text is empty."""
-    if not attachments or not isinstance(attachments, list):
+def format_fallback_attachment_text(attachments: Any, include_photo: bool = False) -> str:
+    """Returns readable fallback badge text for attachments if message text is empty."""
+    if not attachments:
         return ""
     labels = []
-    for att in attachments:
-        if not isinstance(att, dict):
-            continue
-        t = att.get("type", "")
-        if t == "sticker":
-            labels.append("[Стикер]")
-        elif t in ("audio_message", "audiomsg"):
-            labels.append("[Голосовое сообщение]")
-        elif t == "audio":
-            labels.append("[Аудиозапись]")
-        elif t == "doc":
-            doc_title = att.get("doc", {}).get("title", "")
-            labels.append(f"[Документ: {doc_title}]" if doc_title else "[Документ]")
-        elif t == "video":
-            labels.append("[Видеозапись]")
-        elif t == "wall":
-            labels.append("[Запись на стене]")
-        elif t == "link":
-            labels.append("[Ссылка]")
-        elif t != "photo":
-            labels.append("[Вложение]")
+    if isinstance(attachments, dict):
+        for k, v in attachments.items():
+            if k.endswith("_type"):
+                t = str(v).lower()
+                if t == "photo":
+                    if include_photo:
+                        labels.append("[Фотография]")
+                elif t == "sticker":
+                    labels.append("[Стикер]")
+                elif t in ("audio_message", "audiomsg"):
+                    labels.append("[Голосовое сообщение]")
+                elif t == "audio":
+                    labels.append("[Аудиозапись]")
+                elif t == "doc":
+                    labels.append("[Документ]")
+                elif t == "video":
+                    labels.append("[Видеозапись]")
+                elif t == "wall":
+                    labels.append("[Запись на стене]")
+                elif t == "link":
+                    labels.append("[Ссылка]")
+                elif t == "poll":
+                    labels.append("[Опрос]")
+                else:
+                    labels.append("[Вложение]")
+    elif isinstance(attachments, list):
+        for att in attachments:
+            if not isinstance(att, dict):
+                continue
+            t = att.get("type", "").lower()
+            if t == "photo":
+                if include_photo:
+                    labels.append("[Фотография]")
+            elif t == "sticker":
+                labels.append("[Стикер]")
+            elif t in ("audio_message", "audiomsg"):
+                labels.append("[Голосовое сообщение]")
+            elif t == "audio":
+                labels.append("[Аудиозапись]")
+            elif t == "doc":
+                doc_title = att.get("doc", {}).get("title", "")
+                labels.append(f"[Документ: {doc_title}]" if doc_title else "[Документ]")
+            elif t == "video":
+                labels.append("[Видеозапись]")
+            elif t == "wall":
+                labels.append("[Запись на стене]")
+            elif t == "link":
+                labels.append("[Ссылка]")
+            elif t == "poll":
+                labels.append("[Опрос]")
+            else:
+                labels.append("[Вложение]")
     return " ".join(labels)
 
 
@@ -376,16 +438,10 @@ def estimate_bubble_width(
     is_group_chat: bool = False
 ) -> int:
     """Calculates dynamic bubble width in dp so short messages shrink-wrap tightly."""
-    try:
-        from kivy.core.window import Window
-        from kivy.metrics import dp
-        win_w = Window.width / dp(1) if (Window and getattr(Window, "width", 0) > 0) else 380
-    except Exception:
-        win_w = 380
-
+    win_w = get_screen_width_dp()
     avatar_space = 38 if (not is_outgoing and (is_group_chat or sender_name)) else 0
-    avail_w = win_w - 16 - avatar_space
-    max_bubble_w = max(160, int(avail_w * 0.85))
+    avail_w = win_w - 24 - avatar_space
+    max_bubble_w = max(160, int(avail_w - 4))
 
     clean_text = clean_message_text(text) if text else ""
     has_text = bool(clean_text.strip())
@@ -446,7 +502,8 @@ def estimate_message_height(
     fwd_count: int = 0,
     fwd_texts: list = None,
     time_needs_own_line: Optional[bool] = None,
-    photos: Optional[list] = None
+    photos: Optional[list] = None,
+    bubble_w: Optional[int] = None
 ) -> int:
     """
     Accurately calculates message bubble height in dp to eliminate RecycleView layout dancing
@@ -476,10 +533,21 @@ def estimate_message_height(
         if has_text:
             base_padding += 4  # Spacing between photos and text
 
+    if bubble_w is None:
+        bubble_w = estimate_bubble_width(
+            text=clean_text,
+            photos=photos,
+            sender_name="Sender" if has_sender_name else "",
+            has_reply=has_reply,
+            has_fwd=bool(fwd_count),
+            time_needs_own_line=time_needs_own_line,
+            is_outgoing=not has_sender_name
+        )
+
     if has_text:
         if time_needs_own_line:
             base_padding += 13  # Extra line for timestamp only when text is too wide to share line
-        text_height = _measure_text_height(clean_text, font_size_sp=15, is_outgoing=not has_sender_name)
+        text_height = _measure_text_height(clean_text, font_size_sp=15, is_outgoing=not has_sender_name, bubble_w=bubble_w)
     elif not has_photos:
         text_height = 14  # Standalone timestamp min height
     else:
@@ -491,7 +559,7 @@ def estimate_message_height(
         if fwd_texts:
             for ft in fwd_texts:
                 if ft:
-                    fwd_extra += _measure_text_height(ft, font_size_sp=14)
+                    fwd_extra += _measure_text_height(ft, font_size_sp=14, bubble_w=bubble_w)
 
     total = base_padding + text_height + fwd_extra
     return max(36, int(total))
