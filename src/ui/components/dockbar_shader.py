@@ -331,7 +331,20 @@ class DockbarShaderRenderer:
         self.current_bg_type: str = "theme"
         self._clock_event = None
         self._start_time = time.time()
+        self._last_capture_time = 0.0
         self._init_done = False
+
+    def is_visible_on_screen(self) -> bool:
+        """Checks whether the dockbar belongs to the currently active Screen in ScreenManager."""
+        dockbar = self.dockbar
+        if not dockbar or dockbar.opacity <= 0 or not dockbar.get_root_window():
+            return False
+        p = dockbar.parent
+        while p and not hasattr(p, "name"):
+            p = p.parent
+        if p and hasattr(p, "manager") and p.manager:
+            return p.manager.current == p.name
+        return True
 
     def init_gl(self):
         """Initializes RenderContext lazily when OpenGL context is ready."""
@@ -362,13 +375,20 @@ class DockbarShaderRenderer:
 
     def _capture_framebuffer(self, instr):
         """Copies rendered screen pixels behind the dockbar into bg_texture for refraction."""
-        if not self.bg_texture or self.current_bg_type == "theme":
+        if not self.bg_texture or self.current_bg_type == "theme" or not self.is_visible_on_screen():
             return
+
+        now = time.time()
+        # Throttle captures on mobile during fast scroll to eliminate TBDR tile stalling
+        if IS_MOBILE and (now - self._last_capture_time < 0.040):
+            return
+        self._last_capture_time = now
+
         dockbar = self.dockbar
         try:
             from kivy.core.window import Window
 
-            win_pos = dockbar.to_window(dockbar.x, dockbar.y)
+            win_pos = dockbar.to_window(0, 0)
             win_x = int(win_pos[0])
             win_y = int(win_pos[1])
             w = max(1, int(dockbar.width))
@@ -509,7 +529,7 @@ class DockbarShaderRenderer:
 
     def _on_tick(self, dt):
         """Animation update tick."""
-        if not self.render_context or self.current_bg_type == "theme":
+        if not self.is_visible_on_screen() or not self.render_context or self.current_bg_type == "theme":
             return
         elapsed = time.time() - self._start_time
         self.render_context["time"] = float(elapsed)

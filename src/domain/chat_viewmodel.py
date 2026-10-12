@@ -56,6 +56,8 @@ class ChatViewModel(BaseViewModel):
 
     def open_chat(self, peer_id: int, title: str, avatar_url: str = "", is_channel: bool = False, is_muted: bool = False, unread_count: int = 0):
         """Initializes chat state for a given peer."""
+        if getattr(self, "peer_id", None) != peer_id:
+            self.messages = []
         self.peer_id = peer_id
         self.chat_title = title
         self.avatar_url = avatar_url
@@ -68,7 +70,6 @@ class ChatViewModel(BaseViewModel):
         self.has_more_older = True
         self.is_loading_history = False
         self._update_notification_button_text()
-        self.messages = []
         self.input_text = ""
 
         # Point 4: offset = unread_count - 10 if unread_count >= 10 else 0
@@ -154,7 +155,20 @@ class ChatViewModel(BaseViewModel):
 
         self.run_task(_sync_channel_info(), on_success=_on_channel_info, show_loader=False)
 
-        # 1. Fetch fresh messages from VK API around initial_offset
+        # 1. Immediately load cached messages from local SQLite so UI renders with ZERO delay (no black screen)
+        async def _load_cached():
+            try:
+                return await messages_repo.get_cached_messages(self.peer_id, limit=40)
+            except Exception:
+                return []
+
+        def _on_cached(cached_items: List[VKMessage]):
+            if cached_items and not self.messages:
+                self._update_messages_list(cached_items)
+
+        self.run_task(_load_cached(), on_success=_on_cached, show_loader=False)
+
+        # 2. Fetch fresh messages from VK API around initial_offset
         async def _load_fresh():
             try:
                 fresh = await messages_repo.fetch_messages(self.peer_id, offset=initial_offset, count=40)
@@ -170,7 +184,7 @@ class ChatViewModel(BaseViewModel):
                     self.has_more_older = False
                 self._update_messages_list(fresh_items)
 
-        self.run_task(_load_fresh(), on_success=_on_fresh, show_loader=not bool(self.messages))
+        self.run_task(_load_fresh(), on_success=_on_fresh, show_loader=False)
 
     def load_older_messages(self, on_data_ready=None):
         """Loads older messages when user scrolls up towards the top of chat history."""

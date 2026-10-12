@@ -261,12 +261,13 @@ class ChatScreen(MDScreen):
                             rv._anim_y.stop(rv)
                             rv._anim_y = None
                         self.vm.messages = merged
+                        rv.refresh_from_data()
                         rv.scroll_y = new_scroll_y
                         if hasattr(rv, "_update_effect_y_bounds"):
                             rv._update_effect_y_bounds()
-                        Clock.schedule_once(lambda dt: setattr(rv, "scroll_y", new_scroll_y), 0)
                     else:
                         self.vm.messages = merged
+                        rv.refresh_from_data()
 
             self.vm.load_older_messages(on_data_ready=_on_older_ready)
 
@@ -292,12 +293,13 @@ class ChatScreen(MDScreen):
                             rv._anim_y.stop(rv)
                             rv._anim_y = None
                         self.vm.messages = merged
+                        rv.refresh_from_data()
                         rv.scroll_y = new_scroll_y
                         if hasattr(rv, "_update_effect_y_bounds"):
                             rv._update_effect_y_bounds()
-                        Clock.schedule_once(lambda dt: setattr(rv, "scroll_y", new_scroll_y), 0)
                     else:
                         self.vm.messages = merged
+                        rv.refresh_from_data()
 
             self.vm.load_newer_messages(on_data_ready=_on_newer_ready)
 

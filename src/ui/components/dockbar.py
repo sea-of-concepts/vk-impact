@@ -69,6 +69,8 @@ class DockBar(BoxLayout):
                 self.active_tab = "logs"
             elif screen.name == ScreenName.SETTINGS:
                 self.active_tab = "settings"
+        if hasattr(self, "shader_renderer") and self.shader_renderer:
+            self.shader_renderer.update_geometry()
 
     def switch_tab(self, tab_name: str):
         """Switches active section and triggers screen change."""
