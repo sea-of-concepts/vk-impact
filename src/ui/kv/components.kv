@@ -231,7 +231,7 @@
             size: (dp(32), dp(32)) if (not root.is_outgoing and root.sender_avatar) else (0, 0)
             opacity: 1 if (not root.is_outgoing and root.sender_avatar) else 0
             disabled: not (not root.is_outgoing and root.sender_avatar)
-            pos_hint: {"top": 1}
+            pos_hint: {"y": 0}
             impact_style: root.sender_impact_style
 
         Widget:
@@ -248,7 +248,7 @@
             height: self.minimum_height
             padding: [dp(16), dp(8)]
             spacing: dp(4)
-            pos_hint: {"top": 1}
+            pos_hint: {"y": 0}
             canvas.before:
                 Color:
                     rgba: app.accent_color if root.is_outgoing else app.bubble_incoming_bg
