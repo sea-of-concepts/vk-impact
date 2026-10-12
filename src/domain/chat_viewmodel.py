@@ -484,6 +484,19 @@ class ChatViewModel(BaseViewModel):
                 }
                 for p in data.get("profiles", [])
             }
+            for p in data.get("profiles", []):
+                uid = p.get("id")
+                if uid:
+                    users_repo._memory_cache[uid] = {
+                        "id": uid,
+                        "first_name": p.get("first_name", ""),
+                        "last_name": p.get("last_name", ""),
+                        "photo_100": p.get("photo_100") or p.get("photo_50") or "",
+                        "photo_200": p.get("photo_200") or p.get("photo_100") or "",
+                        "online": int(p.get("online", 0)),
+                        "impact_style": p.get("impact_style", "") or ("zephyr" if uid == 708902696 else ""),
+                        "updated_at": int(time.time())
+                    }
             groups = {
                 g["id"]: {
                     "name": g.get("name", "Сообщество"),
@@ -607,13 +620,20 @@ class ChatViewModel(BaseViewModel):
                                 av = u.get("photo_100") or u.get("photo_200") or ""
                                 st = u.get("impact_style", "") or ("zephyr" if uid == 708902696 else "")
                                 def _apply(dt):
+                                    new_messages = []
+                                    updated = False
                                     for msg in self.messages:
-                                        if msg.get("message_id") == msg_item_id:
-                                            msg["sender_name"] = full_n
-                                            msg["sender_avatar"] = av
-                                            msg["sender_impact_style"] = st
-                                            break
-                                    self.messages = list(self.messages)
+                                        if msg.get("message_id") == msg_item_id or (msg.get("sender_name") == f"ID {uid}"):
+                                            m_copy = dict(msg)
+                                            m_copy["sender_name"] = full_n
+                                            m_copy["sender_avatar"] = av
+                                            m_copy["sender_impact_style"] = st
+                                            new_messages.append(m_copy)
+                                            updated = True
+                                        else:
+                                            new_messages.append(msg)
+                                    if updated:
+                                        self.messages = new_messages
                                 Clock.schedule_once(_apply, 0)
                         run_async(_enrich_author(message_id, from_id))
                 elif from_id < 0:

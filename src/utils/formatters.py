@@ -122,7 +122,7 @@ def truncate_text(text: str, max_length: int = 50) -> str:
 
 
 def _measure_text_height(text: str, font_size_sp: int = 15) -> int:
-    """Measures exact rendered text height in dp using Kivy's CoreLabel engine."""
+    """Measures exact rendered text height in dp using Kivy's CoreLabel engine targeting mobile bubble width."""
     if not text:
         return 0
     try:
@@ -131,11 +131,12 @@ def _measure_text_height(text: str, font_size_sp: int = 15) -> int:
         from kivy.metrics import dp, sp
 
         win_w = Window.width if (Window and getattr(Window, "width", 0) > 0) else dp(380)
-        bubble_text_w = max(dp(160), win_w * 0.78 - dp(32))
+        win_w_dp = min(dp(390), win_w)
+        bubble_text_w = max(dp(160), (win_w_dp - dp(38)) * 0.78 - dp(28))
         core = CoreLabel(text=text, font_size=sp(font_size_sp), text_size=(bubble_text_w, None))
         core.refresh()
         if core.texture and core.texture.size[1] > 0:
-            return int(core.texture.size[1] / dp(1)) + 8
+            return int(core.texture.size[1] / dp(1)) + 4
     except Exception:
         pass
 
@@ -146,7 +147,7 @@ def _measure_text_height(text: str, font_size_sp: int = 15) -> int:
         line_len = len(line)
         wrapped_count = max(1, (line_len + 25) // 26)
         total_lines += wrapped_count
-    return total_lines * (font_size_sp + 7)
+    return total_lines * (font_size_sp + 5)
 
 
 def estimate_message_height(
@@ -160,16 +161,16 @@ def estimate_message_height(
     Accurately calculates message bubble height in dp to eliminate RecycleView layout dancing
     and ensure proper spacing between messages even on large text blocks.
     """
-    base_padding = 48  # content_box padding (16) + timestamp row (14) + spacings (8) + bubble row padding (4) + safety margin (6)
+    base_padding = 34  # content_box padding (8) + timestamp row (13) + spacings (4) + bubble row padding (4) + safety margin (5)
     if has_sender_name:
-        base_padding += 20  # Sender name header (16) + spacing (4)
+        base_padding += 17  # Sender name header (15) + spacing (2)
 
     if has_reply:
-        base_padding += 42  # Reply preview box (36) + spacing (4) + margin (2)
+        base_padding += 38  # Reply preview box (36) + spacing (2)
 
     fwd_extra = 0
     if fwd_count > 0:
-        fwd_extra += fwd_count * 42  # Author avatar + name + timestamp header per forward (26) + spacing (6) + padding (6) + margin (4)
+        fwd_extra += fwd_count * 38
         if fwd_texts:
             for ft in fwd_texts:
                 if ft:
@@ -177,7 +178,7 @@ def estimate_message_height(
 
     text_height = _measure_text_height(text, font_size_sp=15) if text else 0
     total = base_padding + text_height + fwd_extra
-    return max(52, int(total))
+    return max(48, int(total))
 
 
 

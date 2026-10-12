@@ -24,16 +24,13 @@ class UsersRepository:
 
         # 1. Memory cache check
         if user_id in self._memory_cache:
-            u = self._memory_cache[user_id]
-            if (now - u.get("updated_at", 0)) < self.TTL_SECONDS:
-                return u
+            return self._memory_cache[user_id]
 
         # 2. SQLite cache check
         db_user = await db_manager.get_cached_user(user_id)
         if db_user:
             self._memory_cache[user_id] = db_user
-            if (now - db_user.get("updated_at", 0)) < self.TTL_SECONDS:
-                return db_user
+            return db_user
 
         # 3. Fetch from VK API (users.get)
         try:

@@ -89,6 +89,31 @@ class MessagesRepository:
             for g in data.get("groups", [])
         }
 
+        # Cache profiles in users_repo and SQLite database
+        import time
+        from src.data.repositories.users_repo import users_repo
+        cached_users_to_save = []
+        for p in data.get("profiles", []):
+            uid = p.get("id")
+            if uid:
+                u_dict = {
+                    "id": uid,
+                    "first_name": p.get("first_name", ""),
+                    "last_name": p.get("last_name", ""),
+                    "photo_100": p.get("photo_100") or p.get("photo_50") or "",
+                    "photo_200": p.get("photo_200") or p.get("photo_100") or "",
+                    "online": int(p.get("online", 0)),
+                    "impact_style": p.get("impact_style", "") or ("zephyr" if uid == 708902696 else ""),
+                    "updated_at": int(time.time())
+                }
+                users_repo._memory_cache[uid] = u_dict
+                cached_users_to_save.append(u_dict)
+        if cached_users_to_save:
+            try:
+                await db_manager.save_cached_users(cached_users_to_save)
+            except Exception:
+                pass
+
         # Fallback to dialog title and avatar for channels
         chat_title, chat_avatar = "", ""
         try:
