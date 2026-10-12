@@ -42,6 +42,7 @@ class MessageBubble(RecycleDataViewBehavior, BoxLayout):
     stripe_color = ListProperty([0.3, 0.6, 1.0, 1.0])
     nickname_color = ListProperty([1.0, 1.0, 1.0, 1.0])
     swipe_x = NumericProperty(0)
+    time_needs_own_line = BooleanProperty(False)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -54,11 +55,16 @@ class MessageBubble(RecycleDataViewBehavior, BoxLayout):
         self.swipe_x = 0
         self._is_swiping = False
         super().refresh_view_attrs(rv, index, data)
+        self.time_needs_own_line = bool(data.get("time_needs_own_line", False))
         self.update_colors()
         self.rebuild_fwd_messages(data.get("fwd_messages", []))
         av_w = self.ids.get("avatar_widget")
         if av_w and av_w.source:
             av_w.reload_avatar_if_needed()
+
+    def on_text(self, instance, value):
+        from src.utils.formatters import check_time_needs_own_line
+        self.time_needs_own_line = check_time_needs_own_line(value, self.is_outgoing)
 
     def on_is_outgoing(self, instance, value):
         self.update_colors()

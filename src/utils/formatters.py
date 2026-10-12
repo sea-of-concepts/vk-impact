@@ -150,23 +150,80 @@ def _measure_text_height(text: str, font_size_sp: int = 15) -> int:
     return total_lines * (font_size_sp + 5)
 
 
+def check_time_needs_own_line(text: str, is_outgoing: bool = False, max_w_dp: float = 235.0) -> bool:
+    """
+    Returns True if the last line of text is too wide to fit the timestamp inline,
+    requiring a separate row below the text.
+    """
+    if not text:
+        return False
+    time_space_dp = 54.0 if is_outgoing else 40.0
+    lines = text.split("\n")
+    last_paragraph = lines[-1].strip()
+    if not last_paragraph:
+        return False
+
+    words = last_paragraph.split(" ")
+    cur_line_words = []
+    wrapped_lines = []
+    try:
+        from kivy.core.text import Label as CoreLabel
+        from kivy.metrics import dp, sp
+        max_px = dp(max_w_dp)
+        for w in words:
+            if not w:
+                continue
+            test_line = " ".join(cur_line_words + [w]) if cur_line_words else w
+            c = CoreLabel(text=test_line, font_size=sp(15))
+            c.refresh()
+            if c.texture and c.texture.size[0] > max_px:
+                if cur_line_words:
+                    wrapped_lines.append(" ".join(cur_line_words))
+                    cur_line_words = [w]
+                else:
+                    wrapped_lines.append(w)
+                    cur_line_words = []
+            else:
+                cur_line_words.append(w)
+        if cur_line_words:
+            wrapped_lines.append(" ".join(cur_line_words))
+
+        last_line = wrapped_lines[-1] if wrapped_lines else ""
+        c_last = CoreLabel(text=last_line, font_size=sp(15))
+        c_last.refresh()
+        last_w_dp = (c_last.texture.size[0] / dp(1)) if (c_last.texture and c_last.texture.size[0] > 0) else 0
+        return (last_w_dp + time_space_dp) > max_w_dp
+    except Exception:
+        last_chars = len(last_paragraph) % 26
+        if last_chars == 0 and len(last_paragraph) > 0:
+            last_chars = 26
+        return last_chars > 20
+
+
 def estimate_message_height(
     text: str,
     has_sender_name: bool = False,
     has_reply: bool = False,
     fwd_count: int = 0,
-    fwd_texts: list = None
+    fwd_texts: list = None,
+    time_needs_own_line: Optional[bool] = None
 ) -> int:
     """
     Accurately calculates message bubble height in dp to eliminate RecycleView layout dancing
     and ensure proper spacing between messages even on large text blocks.
     """
-    base_padding = 34  # content_box padding (8) + timestamp row (13) + spacings (4) + bubble row padding (4) + safety margin (5)
+    if time_needs_own_line is None:
+        time_needs_own_line = check_time_needs_own_line(text, is_outgoing=not has_sender_name)
+
+    base_padding = 22  # content_box padding (8) + bubble row padding (4) + safety margin (10)
     if has_sender_name:
         base_padding += 17  # Sender name header (15) + spacing (2)
 
     if has_reply:
         base_padding += 38  # Reply preview box (36) + spacing (2)
+
+    if time_needs_own_line:
+        base_padding += 13  # Extra line for timestamp only when text is too wide to share line
 
     fwd_extra = 0
     if fwd_count > 0:
@@ -178,7 +235,7 @@ def estimate_message_height(
 
     text_height = _measure_text_height(text, font_size_sp=15) if text else 0
     total = base_padding + text_height + fwd_extra
-    return max(48, int(total))
+    return max(42, int(total))
 
 
 

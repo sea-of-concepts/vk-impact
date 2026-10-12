@@ -12,7 +12,7 @@ from src.core.events import event_bus
 from src.core.constants import EventType
 from src.core.logger import logger
 from src.utils.async_tools import run_async
-from src.utils.formatters import format_timestamp, estimate_message_height
+from src.utils.formatters import format_timestamp, estimate_message_height, check_time_needs_own_line
 
 
 class ChatViewModel(BaseViewModel):
@@ -328,7 +328,8 @@ class ChatViewModel(BaseViewModel):
 
         # Optimistically add message to current chat UI immediately
         temp_id = -now
-        height = estimate_message_height(text, has_sender_name=False, has_reply=bool(reply_preview))
+        time_needs_own = check_time_needs_own_line(text, is_outgoing=True)
+        height = estimate_message_height(text, has_sender_name=False, has_reply=bool(reply_preview), time_needs_own_line=time_needs_own)
         opt_item = {
             "message_id": temp_id,
             "text": text,
@@ -341,6 +342,7 @@ class ChatViewModel(BaseViewModel):
             "show_new_divider": False,
             "reply_message": reply_preview or {},
             "fwd_messages": [],
+            "time_needs_own_line": time_needs_own,
             "msg_size": [None, dp(height)]
         }
         self.messages = list(self.messages) + [opt_item]
@@ -402,12 +404,14 @@ class ChatViewModel(BaseViewModel):
                                 _collect_texts(nested)
                 _collect_texts(fwds)
 
+            time_needs_own = check_time_needs_own_line(m.text or "", m.is_outgoing)
             base_height = estimate_message_height(
                 m.text or "",
                 has_sender_name=has_sender,
                 has_reply=bool(reply),
                 fwd_count=max(len(fwds), len(fwd_texts)),
-                fwd_texts=fwd_texts
+                fwd_texts=fwd_texts,
+                time_needs_own_line=time_needs_own
             )
             total_height = base_height + (28 if is_first_unread else 0)
 
@@ -428,6 +432,7 @@ class ChatViewModel(BaseViewModel):
                 "show_new_divider": is_first_unread,
                 "reply_message": reply if isinstance(reply, dict) else {},
                 "fwd_messages": fwds if isinstance(fwds, list) else [],
+                "time_needs_own_line": time_needs_own,
                 "msg_size": [None, dp(total_height)]
             }
         except Exception as e:
@@ -645,12 +650,14 @@ class ChatViewModel(BaseViewModel):
         fwd_texts = [f.get("text", "") for f in fwds if isinstance(f, dict)]
 
         has_sender = bool(sender_name and not is_out)
+        time_needs_own = check_time_needs_own_line(text, is_out)
         height = estimate_message_height(
             text,
             has_sender_name=has_sender,
             has_reply=bool(reply),
             fwd_count=len(fwds),
-            fwd_texts=fwd_texts
+            fwd_texts=fwd_texts,
+            time_needs_own_line=time_needs_own
         )
 
         new_item = {
@@ -665,6 +672,7 @@ class ChatViewModel(BaseViewModel):
             "show_new_divider": False,
             "reply_message": reply if isinstance(reply, dict) else {},
             "fwd_messages": fwds if isinstance(fwds, list) else [],
+            "time_needs_own_line": time_needs_own,
             "msg_size": [None, dp(height)]
         }
         self.messages = list(self.messages) + [new_item]
