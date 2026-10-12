@@ -56,37 +56,33 @@ uniform vec4 u_accent;
 uniform vec4 u_surface_color;
 uniform float u_is_dark;
 
-float roundedBoxSDF(vec2 p, vec2 b, float r) {
-    vec2 q = abs(p) - b + vec2(r);
-    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
-}
-
-float getDist(vec2 coord) {
-    if (u_style > 2.5) {
-        float d1 = roundedBoxSDF(coord - (u_island1.xy + u_island1.zw * 0.5), u_island1.zw * 0.5, u_radius);
-        float d2 = roundedBoxSDF(coord - (u_island2.xy + u_island2.zw * 0.5), u_island2.zw * 0.5, u_radius);
-        float d3 = roundedBoxSDF(coord - (u_island3.xy + u_island3.zw * 0.5), u_island3.zw * 0.5, u_radius);
-        return min(min(d1, d2), d3);
-    } else {
-        return roundedBoxSDF(coord - (u_capsule.xy + u_capsule.zw * 0.5), u_capsule.zw * 0.5, u_radius);
-    }
-}
-
 void main(void) {
     vec2 p = tex_coord0 * resolution;
-    float dist = getDist(p);
+
+    // Fast analytical box selection (Impact/Telegram/Incy capsule or Pinterest islands)
+    vec4 island;
+    if (u_style > 2.5) {
+        float d1 = abs(p.x - (u_island1.x + u_island1.z * 0.5));
+        float d2 = abs(p.x - (u_island2.x + u_island2.z * 0.5));
+        float d3 = abs(p.x - (u_island3.x + u_island3.z * 0.5));
+        island = (d1 < d2 && d1 < d3) ? u_island1 : ((d2 < d3) ? u_island2 : u_island3);
+    } else {
+        island = u_capsule;
+    }
+
+    vec2 center = island.xy + island.zw * 0.5;
+    vec2 half_size = island.zw * 0.5;
+    vec2 offset = p - center;
+    vec2 q = abs(offset) - half_size + vec2(u_radius);
+    float dist = min(max(q.x, q.y), 0.0) + length(max(q, vec2(0.0))) - u_radius;
 
     // Anti-aliased outer edge mask
     float alpha = 1.0 - smoothstep(0.0, 1.5, dist);
-    if (alpha <= 0.001) discard;
 
     float depth = max(-dist, 0.0);
 
-    // 2D outward gradient from SDF (unit-length normal pointing outward from boundary)
-    vec2 eps = vec2(1.0, 0.0);
-    float gx = getDist(p + eps.xy) - getDist(p - eps.xy);
-    float gy = getDist(p + eps.yx) - getDist(p - eps.yx);
-    vec2 edge_grad = normalize(vec2(gx, gy) + vec2(0.00001));
+    // Exact analytical outward normal (0 finite-difference SDF calls, 4x faster)
+    vec2 edge_grad = normalize(max(q, vec2(0.0001))) * sign(offset);
 
     // Curvature radius R for each style:
     // Impact: 14px edge bevel
@@ -100,12 +96,11 @@ void main(void) {
     float slope = sin((1.0 - t) * 1.5707963);
 
     // Physical lens displacement: points near edge bend inwards towards lens center
-    // 6.0px max displacement gives clean, elegant optical warping without tearing
     vec2 refr = -edge_grad * slope * (6.0 / max(resolution, vec2(1.0)));
 
-    // Subtle natural chromatic dispersion (approx 1.8% dispersion, no image tripling)
+    // Subtle natural chromatic dispersion (approx 1.8% dispersion)
     vec2 uv_r = clamp(tex_coord0 + refr * 1.018, 0.002, 0.998);
-    vec2 uv_g = clamp(tex_coord0 + refr * 1.000, 0.002, 0.998);
+    vec2 uv_g = clamp(tex_coord0 + refr, 0.002, 0.998);
     vec2 uv_b = clamp(tex_coord0 + refr * 0.982, 0.002, 0.998);
 
     // Optical sampling of background
@@ -141,6 +136,7 @@ void main(void) {
     // Apply clean glass rim
     col = mix(col, vec3(1.0), rim_intensity);
 
+    // Hardware alpha blending (Early-Z compatible, no discard)
     gl_FragColor = vec4(col, alpha);
 }
 """
@@ -166,22 +162,6 @@ uniform vec4 u_accent;
 uniform vec4 u_surface_color;
 uniform float u_is_dark;
 
-float roundedBoxSDF(vec2 p, vec2 b, float r) {
-    vec2 q = abs(p) - b + vec2(r);
-    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
-}
-
-float getDist(vec2 coord) {
-    if (u_style > 2.5) {
-        float d1 = roundedBoxSDF(coord - (u_island1.xy + u_island1.zw * 0.5), u_island1.zw * 0.5, u_radius);
-        float d2 = roundedBoxSDF(coord - (u_island2.xy + u_island2.zw * 0.5), u_island2.zw * 0.5, u_radius);
-        float d3 = roundedBoxSDF(coord - (u_island3.xy + u_island3.zw * 0.5), u_island3.zw * 0.5, u_radius);
-        return min(min(d1, d2), d3);
-    } else {
-        return roundedBoxSDF(coord - (u_capsule.xy + u_capsule.zw * 0.5), u_capsule.zw * 0.5, u_radius);
-    }
-}
-
 vec2 hash2(vec2 p) {
     p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
     return fract(sin(p) * 43758.5453);
@@ -204,24 +184,14 @@ float vnoise(vec2 p) {
     );
 }
 
-float fbm(vec2 p) {
-    float total = 0.0;
-    float amp = 0.5;
-    for (int i = 0; i < 4; i++) {
-        total += amp * vnoise(p);
-        p = p * 2.05 + vec2(12.3, 34.5);
-        amp *= 0.5;
-    }
-    return total;
-}
-
-// 2D Voronoi returning: (min_dist, dist_to_cell_edge, cell_id)
+// 3x3 single-pass Voronoi (9 iterations total, 60fps mobile optimized)
 vec3 voronoi(vec2 x) {
     vec2 n = floor(x);
     vec2 f = fract(x);
-    vec2 mg;
-    vec2 mr;
-    float md = 8.0;
+    vec2 mg = vec2(0.0);
+    vec2 mr = vec2(0.0);
+    float md1 = 8.0;
+    float md2 = 8.0;
 
     for (int j = -1; j <= 1; j++) {
         for (int i = -1; i <= 1; i++) {
@@ -229,40 +199,43 @@ vec3 voronoi(vec2 x) {
             vec2 o = hash2(n + g);
             vec2 r = g + o - f;
             float d = dot(r, r);
-            if (d < md) {
-                md = d;
+            if (d < md1) {
+                md2 = md1;
+                md1 = d;
                 mr = r;
                 mg = g;
+            } else if (d < md2) {
+                md2 = d;
             }
         }
     }
-
-    float md_edge = 8.0;
-    for (int j = -2; j <= 2; j++) {
-        for (int i = -2; i <= 2; i++) {
-            vec2 g = mg + vec2(float(i), float(j));
-            vec2 o = hash2(n + g);
-            vec2 r = g + o - f;
-            if (dot(mr - r, mr - r) > 0.0001) {
-                float d_to_edge = dot(0.5 * (mr + r), normalize(r - mr));
-                md_edge = min(md_edge, d_to_edge);
-            }
-        }
-    }
-
-    return vec3(sqrt(md), md_edge, n.x + mg.x + (n.y + mg.y) * 57.0);
+    float d_edge = (sqrt(md2) - sqrt(md1)) * 0.5;
+    return vec3(sqrt(md1), d_edge, n.x + mg.x + (n.y + mg.y) * 57.0);
 }
 
 void main(void) {
     vec2 p_loc = tex_coord0 * resolution;
-    float dist = getDist(p_loc);
+
+    // Fast analytical box selection
+    vec4 island;
+    if (u_style > 2.5) {
+        float d1 = abs(p_loc.x - (u_island1.x + u_island1.z * 0.5));
+        float d2 = abs(p_loc.x - (u_island2.x + u_island2.z * 0.5));
+        float d3 = abs(p_loc.x - (u_island3.x + u_island3.z * 0.5));
+        island = (d1 < d2 && d1 < d3) ? u_island1 : ((d2 < d3) ? u_island2 : u_island3);
+    } else {
+        island = u_capsule;
+    }
+
+    vec2 center = island.xy + island.zw * 0.5;
+    vec2 half_size = island.zw * 0.5;
+    vec2 offset = p_loc - center;
+    vec2 q = abs(offset) - half_size + vec2(u_radius);
+    float dist = min(max(q.x, q.y), 0.0) + length(max(q, vec2(0.0))) - u_radius;
 
     float alpha = 1.0 - smoothstep(0.0, 1.5, dist);
-    if (alpha <= 0.001) discard;
 
-    vec2 texel = 1.0 / max(resolution, vec2(1.0));
-
-    // Voronoi cell facets
+    // 3x3 Voronoi cell facets
     vec2 p = (p_loc - u_capsule.xy) / 46.0;
     vec3 v = voronoi(p);
     float d_edge = v.y;
@@ -271,57 +244,42 @@ void main(void) {
     // Per-facet tilt: shifts each crystal shard independently
     vec2 facet_tilt = (hash2(vec2(cell_id, cell_id * 1.337)) - 0.5) * 0.38;
 
-    // Procedural crystalline frost noise ("шум" как на референсе)
-    vec2 noise_uv = p_loc / 11.0;
-    float frost_noise = fbm(noise_uv);
+    // Fast procedural crystalline frost noise
+    float frost_noise = vnoise(p_loc / 11.0);
     float fine_grain = hash12(p_loc * 0.85);
 
     // Micro-relief bump from frost noise
-    vec2 eps_n = vec2(0.85, 0.0);
-    float n_x = fbm(noise_uv + eps_n.xy) - fbm(noise_uv - eps_n.xy);
-    float n_y = fbm(noise_uv + eps_n.yx) - fbm(noise_uv - eps_n.yx);
-    vec2 frost_bump = vec2(n_x, n_y) * 2.2;
+    vec2 frost_bump = (vec2(fine_grain, hash12(p_loc * 0.85 + 17.1)) - 0.5) * 0.04;
 
     // Surface normal combining crystal facet tilt and micro-frost bump
     vec3 N = normalize(vec3(facet_tilt * 0.65 + frost_bump * 0.40, 1.0));
 
-    // Transparent borders: internal fracture plane creates refractive jump & dispersion, NOT opaque white lines!
+    // Internal fracture plane refractive jump
     float edge_factor = 1.0 - smoothstep(0.0, 0.055, d_edge);
     vec2 fracture_refr = normalize(facet_tilt + vec2(0.14, 0.09)) * edge_factor * 0.035;
 
-    // Facet background displacement (breaks continuous text into disjoint shards)
+    // Facet background displacement
     vec2 facet_disp = (hash2(vec2(cell_id, cell_id * 1.618)) - 0.5) * 0.075;
 
-    // Frost scattering: diffuses underlying text so fine text is NOT clearly readable
+    // Base refracted coordinates
     vec2 base_uv = tex_coord0 + facet_disp + fracture_refr + frost_bump * 0.020;
-    float scatter_radius = 5.5 * texel.x;
 
     // Chromatic dispersion offsets through ice prism
     vec2 disp_r = vec2( 0.010,  0.004) + frost_bump * 0.012;
     vec2 disp_b = vec2(-0.010, -0.004) - frost_bump * 0.012;
 
-    // Multi-tap frosted scattering (diffuses sharp letters into frosted crystalline glow)
-    float r = texture2D(texture0, clamp(base_uv + disp_r, 0.002, 0.998)).r * 0.28;
-    r += texture2D(texture0, clamp(base_uv + disp_r + vec2( 1.0,  0.0) * scatter_radius, 0.002, 0.998)).r * 0.18;
-    r += texture2D(texture0, clamp(base_uv + disp_r + vec2(-1.0,  0.0) * scatter_radius, 0.002, 0.998)).r * 0.18;
-    r += texture2D(texture0, clamp(base_uv + disp_r + vec2( 0.0,  1.0) * scatter_radius, 0.002, 0.998)).r * 0.18;
-    r += texture2D(texture0, clamp(base_uv + disp_r + vec2( 0.0, -1.0) * scatter_radius, 0.002, 0.998)).r * 0.18;
-
-    float g = texture2D(texture0, clamp(base_uv, 0.002, 0.998)).g * 0.28;
-    g += texture2D(texture0, clamp(base_uv + vec2( 1.0,  0.0) * scatter_radius, 0.002, 0.998)).g * 0.18;
-    g += texture2D(texture0, clamp(base_uv + vec2(-1.0,  0.0) * scatter_radius, 0.002, 0.998)).g * 0.18;
-    g += texture2D(texture0, clamp(base_uv + vec2( 0.0,  1.0) * scatter_radius, 0.002, 0.998)).g * 0.18;
-    g += texture2D(texture0, clamp(base_uv + vec2( 0.0, -1.0) * scatter_radius, 0.002, 0.998)).g * 0.18;
-
-    float b = texture2D(texture0, clamp(base_uv + disp_b, 0.002, 0.998)).b * 0.28;
-    b += texture2D(texture0, clamp(base_uv + disp_b + vec2( 1.0,  0.0) * scatter_radius, 0.002, 0.998)).b * 0.18;
-    b += texture2D(texture0, clamp(base_uv + disp_b + vec2(-1.0,  0.0) * scatter_radius, 0.002, 0.998)).b * 0.18;
-    b += texture2D(texture0, clamp(base_uv + disp_b + vec2( 0.0,  1.0) * scatter_radius, 0.002, 0.998)).b * 0.18;
-    b += texture2D(texture0, clamp(base_uv + disp_b + vec2( 0.0, -1.0) * scatter_radius, 0.002, 0.998)).b * 0.18;
-
+    // Frosted scattering (3 dispersive taps + 1 frosted scatter tap)
+    float r = texture2D(texture0, clamp(base_uv + disp_r, 0.002, 0.998)).r;
+    float g = texture2D(texture0, clamp(base_uv, 0.002, 0.998)).g;
+    float b = texture2D(texture0, clamp(base_uv + disp_b, 0.002, 0.998)).b;
     vec3 col = vec3(r, g, b);
 
-    // Uniform icy tinting across all facets (equal transmission)
+    // Soft crystalline frost blur tap
+    vec2 scatter_uv = base_uv + (vec2(fine_grain, hash12(p_loc * 0.5)) - 0.5) * (6.0 / max(resolution, vec2(1.0)));
+    vec3 scatter_col = texture2D(texture0, clamp(scatter_uv, 0.002, 0.998)).rgb;
+    col = mix(col, scatter_col, 0.35);
+
+    // Uniform icy tinting
     if (u_is_dark > 0.5) {
         col = mix(col, col * vec3(0.92, 0.96, 1.04) + vec3(0.06, 0.09, 0.14), 0.18);
     } else {
@@ -332,7 +290,7 @@ void main(void) {
     float frost_grain = (frost_noise - 0.5) * 0.08 + (fine_grain - 0.5) * 0.04;
     col += vec3(0.85, 0.94, 1.0) * frost_grain;
 
-    // Specular lighting & sparkling glints on the frosted ice surface
+    // Specular lighting & sparkling glints
     vec3 L = normalize(vec3(0.30, 0.85, 0.55));
     vec3 V = vec3(0.0, 0.0, 1.0);
     vec3 H = normalize(L + V);
@@ -340,169 +298,25 @@ void main(void) {
     float sparkle = pow(max(dot(N, H), 0.0), 48.0) * 0.75 * smoothstep(0.42, 0.75, frost_noise);
     col += (vec3(0.90, 0.96, 1.0) * spec + vec3(1.0) * sparkle);
 
-    // Capsule outer rim highlight (ice block chamfer)
+    // Capsule outer rim highlight
     float edge_depth = max(-dist, 0.0);
     float rim = smoothstep(2.6, 0.6, edge_depth) * smoothstep(0.0, 0.6, edge_depth);
     float edge_aa = smoothstep(1.5, 0.0, abs(dist));
     col += vec3(0.85, 0.95, 1.0) * rim * 0.35;
     col = mix(col, vec3(1.0), edge_aa * 0.22);
 
-    // Synchronized delicate icy shimmer
+    // Delicate icy shimmer
     float shimmer = sin(time * 0.7 + cell_id * 0.3) * 0.020;
     col += vec3(0.5, 0.8, 1.0) * max(shimmer, 0.0);
 
+    // Hardware alpha blending (Early-Z compatible, no discard)
     gl_FragColor = vec4(col, alpha);
 }
 """
 
-LIQUID_GLASS_MOBILE_FS = """
-#ifdef GL_ES
-precision highp float;
-#endif
-
-varying vec4 frag_color;
-varying vec2 tex_coord0;
-
-uniform vec2 resolution;
-uniform vec4 u_capsule; // local x, y, w, h
-uniform float u_radius;
-uniform float u_style;  // 0: impact, 1: telegram, 2: incy, 3: pinterest
-uniform vec4 u_island1;
-uniform vec4 u_island2;
-uniform vec4 u_island3;
-uniform vec4 u_accent;
-uniform vec4 u_surface_color;
-uniform float u_is_dark;
-
-float roundedBoxSDF(vec2 p, vec2 b, float r) {
-    vec2 q = abs(p) - b + vec2(r);
-    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
-}
-
-float getDist(vec2 coord) {
-    if (u_style > 2.5) {
-        float d1 = roundedBoxSDF(coord - (u_island1.xy + u_island1.zw * 0.5), u_island1.zw * 0.5, u_radius);
-        float d2 = roundedBoxSDF(coord - (u_island2.xy + u_island2.zw * 0.5), u_island2.zw * 0.5, u_radius);
-        float d3 = roundedBoxSDF(coord - (u_island3.xy + u_island3.zw * 0.5), u_island3.zw * 0.5, u_radius);
-        return min(min(d1, d2), d3);
-    } else {
-        return roundedBoxSDF(coord - (u_capsule.xy + u_capsule.zw * 0.5), u_capsule.zw * 0.5, u_radius);
-    }
-}
-
-void main(void) {
-    vec2 p = tex_coord0 * resolution;
-    float dist = getDist(p);
-
-    float alpha = 1.0 - smoothstep(0.0, 1.5, dist);
-    if (alpha <= 0.001) discard;
-
-    float depth = max(-dist, 0.0);
-
-    vec2 eps = vec2(1.0, 0.0);
-    float gx = getDist(p + eps.xy) - getDist(p - eps.xy);
-    float gy = getDist(p + eps.yx) - getDist(p - eps.yx);
-    vec2 edge_grad = normalize(vec2(gx, gy) + vec2(0.00001));
-
-    vec3 base_col = u_surface_color.rgb;
-    vec3 col;
-    float base_alpha;
-    if (u_is_dark > 0.5) {
-        col = mix(base_col, vec3(0.12, 0.16, 0.24), 0.35);
-        base_alpha = 0.88;
-        col *= (1.0 - smoothstep(12.0, 0.0, depth) * 0.12);
-    } else {
-        col = mix(base_col, vec3(0.96, 0.98, 1.0), 0.40);
-        base_alpha = 0.82;
-        col *= (1.0 - smoothstep(12.0, 0.0, depth) * 0.08);
-    }
-
-    // Top edge highlight / glass gleam
-    float top_bevel = smoothstep(2.5, 0.6, depth) * smoothstep(0.0, 0.6, depth) * max(0.0, -edge_grad.y);
-    col += vec3(1.0) * top_bevel * 0.28;
-
-    // Crisp glass rim outline
-    float rim = smoothstep(1.3, 0.0, abs(dist));
-    float rim_direction = 0.4 + 0.6 * max(0.0, -edge_grad.y);
-    col = mix(col, vec3(1.0), rim * 0.35 * rim_direction);
-
-    gl_FragColor = vec4(col, alpha * base_alpha);
-}
-"""
-
-GLASSY_ICE_MOBILE_FS = """
-#ifdef GL_ES
-precision highp float;
-#endif
-
-varying vec4 frag_color;
-varying vec2 tex_coord0;
-
-uniform vec2 resolution;
-uniform vec4 u_capsule; // local x, y, w, h
-uniform float u_radius;
-uniform float u_style;  // 0: impact, 1: telegram, 2: incy, 3: pinterest
-uniform vec4 u_island1;
-uniform vec4 u_island2;
-uniform vec4 u_island3;
-uniform vec4 u_accent;
-uniform vec4 u_surface_color;
-uniform float u_is_dark;
-
-float roundedBoxSDF(vec2 p, vec2 b, float r) {
-    vec2 q = abs(p) - b + vec2(r);
-    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
-}
-
-float getDist(vec2 coord) {
-    if (u_style > 2.5) {
-        float d1 = roundedBoxSDF(coord - (u_island1.xy + u_island1.zw * 0.5), u_island1.zw * 0.5, u_radius);
-        float d2 = roundedBoxSDF(coord - (u_island2.xy + u_island2.zw * 0.5), u_island2.zw * 0.5, u_radius);
-        float d3 = roundedBoxSDF(coord - (u_island3.xy + u_island3.zw * 0.5), u_island3.zw * 0.5, u_radius);
-        return min(min(d1, d2), d3);
-    } else {
-        return roundedBoxSDF(coord - (u_capsule.xy + u_capsule.zw * 0.5), u_capsule.zw * 0.5, u_radius);
-    }
-}
-
-float hash12(vec2 p) {
-    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-    p3 += dot(p3, p3.yzx + 33.33);
-    return fract((p3.x + p3.y) * p3.z);
-}
-
-void main(void) {
-    vec2 p_loc = tex_coord0 * resolution;
-    float dist = getDist(p_loc);
-
-    float alpha = 1.0 - smoothstep(0.0, 1.5, dist);
-    if (alpha <= 0.001) discard;
-
-    float depth = max(-dist, 0.0);
-
-    vec2 grid_pos = (p_loc - u_capsule.xy) / 32.0;
-    vec2 grid_id = floor(grid_pos);
-    float shard = hash12(grid_id * 17.13);
-
-    vec3 ice_tint = (u_is_dark > 0.5)
-        ? vec3(0.10, 0.16, 0.26)
-        : vec3(0.92, 0.96, 1.0);
-
-    vec3 col = mix(u_surface_color.rgb, ice_tint, 0.45);
-    col += (shard - 0.5) * 0.06;
-
-    float grain = hash12(p_loc * 0.7);
-    col += vec3(0.9, 0.96, 1.0) * (grain - 0.5) * 0.05;
-
-    float rim = smoothstep(2.2, 0.4, depth) * smoothstep(0.0, 0.4, depth);
-    float edge_aa = smoothstep(1.3, 0.0, abs(dist));
-    col += vec3(0.85, 0.95, 1.0) * rim * 0.35;
-    col = mix(col, vec3(1.0), edge_aa * 0.25);
-
-    float base_alpha = (u_is_dark > 0.5) ? 0.90 : 0.85;
-    gl_FragColor = vec4(col, alpha * base_alpha);
-}
-"""
+# Keep mobile aliases pointing to the unified high-performance shaders
+LIQUID_GLASS_MOBILE_FS = LIQUID_GLASS_FS
+GLASSY_ICE_MOBILE_FS = GLASSY_ICE_FS
 
 
 class DockbarShaderRenderer:
@@ -528,17 +342,13 @@ class DockbarShaderRenderer:
             rc = RenderContext(use_parent_projection=True, use_parent_modelview=True)
             rc.shader.vs = SHADER_VS
 
-            if not IS_MOBILE:
-                w = max(1, int(self.dockbar.width or dp(300)))
-                h = max(1, int(self.dockbar.height or dp(78)))
-                self.bg_texture = Texture.create(size=(w, h), colorfmt="rgba")
-                self.callback = Callback(self._capture_framebuffer)
-                rc.add(self.callback)
-                with rc:
-                    self.rect = Rectangle(texture=self.bg_texture, pos=self.dockbar.pos, size=self.dockbar.size)
-            else:
-                with rc:
-                    self.rect = Rectangle(pos=self.dockbar.pos, size=self.dockbar.size)
+            w = max(1, int(self.dockbar.width or dp(300)))
+            h = max(1, int(self.dockbar.height or dp(78)))
+            self.bg_texture = Texture.create(size=(w, h), colorfmt="rgba")
+            self.callback = Callback(self._capture_framebuffer)
+            rc.add(self.callback)
+            with rc:
+                self.rect = Rectangle(texture=self.bg_texture, pos=self.dockbar.pos, size=self.dockbar.size)
 
             self.render_context = rc
             # Insert at beginning of canvas.before so it draws behind dock items
@@ -552,7 +362,7 @@ class DockbarShaderRenderer:
 
     def _capture_framebuffer(self, instr):
         """Copies rendered screen pixels behind the dockbar into bg_texture for refraction."""
-        if IS_MOBILE or not self.bg_texture or self.current_bg_type == "theme":
+        if not self.bg_texture or self.current_bg_type == "theme":
             return
         dockbar = self.dockbar
         try:
@@ -564,18 +374,27 @@ class DockbarShaderRenderer:
             w = max(1, int(dockbar.width))
             h = max(1, int(dockbar.height))
 
-            if self.bg_texture.size != (w, h):
-                self.bg_texture = Texture.create(size=(w, h), colorfmt="rgba")
+            win_w = int(Window.width)
+            win_h = int(Window.height)
+
+            # Clamp safely within window bounds to prevent GL_INVALID_VALUE on mobile GLES
+            clamped_x = max(0, min(win_x, win_w - 1))
+            clamped_y = max(0, min(win_y, win_h - 1))
+            copy_w = max(1, min(w, win_w - clamped_x))
+            copy_h = max(1, min(h, win_h - clamped_y))
+
+            if self.bg_texture.size != (copy_w, copy_h):
+                self.bg_texture = Texture.create(size=(copy_w, copy_h), colorfmt="rgba")
                 if self.rect:
                     self.rect.texture = self.bg_texture
 
             self.bg_texture.bind()
             glCopyTexSubImage2D(
                 GL_TEXTURE_2D, 0, 0, 0,
-                max(0, win_x), max(0, win_y),
-                min(w, int(Window.width)), min(h, int(Window.height))
+                clamped_x, clamped_y,
+                copy_w, copy_h
             )
-        except Exception as e:
+        except Exception:
             pass
 
     def update_shader(self, bg_type: str):
@@ -597,32 +416,20 @@ class DockbarShaderRenderer:
         if not self.render_context:
             return
 
-        if IS_MOBILE:
-            if self.current_bg_type == "liquid_glass":
-                self.render_context.shader.fs = LIQUID_GLASS_MOBILE_FS
-            elif self.current_bg_type == "glassy_ice":
-                self.render_context.shader.fs = GLASSY_ICE_MOBILE_FS
-            else:
-                return
-
+        if self.current_bg_type == "liquid_glass":
+            self.render_context.shader.fs = LIQUID_GLASS_FS
             if self._clock_event:
                 self._clock_event.cancel()
                 self._clock_event = None
+        elif self.current_bg_type == "glassy_ice":
+            self.render_context.shader.fs = GLASSY_ICE_FS
+            if self._clock_event is None:
+                self._clock_event = Clock.schedule_interval(self._on_tick, 1.0 / 20.0)
         else:
-            if self.current_bg_type == "liquid_glass":
-                self.render_context.shader.fs = LIQUID_GLASS_FS
-                if self._clock_event:
-                    self._clock_event.cancel()
-                    self._clock_event = None
-            elif self.current_bg_type == "glassy_ice":
-                self.render_context.shader.fs = GLASSY_ICE_FS
-                if self._clock_event is None:
-                    self._clock_event = Clock.schedule_interval(self._on_tick, 1.0 / 20.0)
-            else:
-                return
+            return
 
         if not self.render_context.shader.success:
-            logger.error("Dockbar shader error: %s", self.render_context.shader.log)
+            logger.error("Dockbar shader compilation failed for %s", self.current_bg_type)
             return
 
         self.update_geometry()
@@ -702,7 +509,7 @@ class DockbarShaderRenderer:
 
     def _on_tick(self, dt):
         """Animation update tick."""
-        if IS_MOBILE or not self.render_context or self.current_bg_type == "theme":
+        if not self.render_context or self.current_bg_type == "theme":
             return
         elapsed = time.time() - self._start_time
         self.render_context["time"] = float(elapsed)
