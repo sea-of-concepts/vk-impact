@@ -11,6 +11,7 @@ from kivy.uix.relativelayout import RelativeLayout
 from src.core.constants import ScreenName
 from src.ui.components.avatar import CircularAvatar
 from src.data.cache.media_cache import media_cache
+from src.utils.formatters import clean_message_text
 
 
 class PhotoItem(RelativeLayout):
@@ -248,9 +249,14 @@ class MessageBubble(RecycleDataViewBehavior, BoxLayout):
     def on_text(self, instance, value):
         from src.utils.formatters import check_time_needs_own_line
         self.time_needs_own_line = check_time_needs_own_line(value, self.is_outgoing)
+        self.update_display_text()
+
+    def on_time_needs_own_line(self, instance, value):
+        self.update_display_text()
 
     def on_is_outgoing(self, instance, value):
         self.update_colors()
+        self.update_display_text()
 
     def update_colors(self, *args):
         app = MDApp.get_running_app()
