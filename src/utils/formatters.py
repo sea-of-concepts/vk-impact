@@ -142,10 +142,10 @@ def _measure_text_height(text: str, font_size_sp: int = 15, is_outgoing: bool = 
         from kivy.core.window import Window
         from kivy.metrics import dp, sp
 
-        win_w = Window.width if (Window and getattr(Window, "width", 0) > 0) else dp(380)
-        win_w_dp = min(dp(390), win_w)
-        bubble_text_w = max(dp(160), (win_w_dp - dp(16)) * 0.78 - dp(28))
-        core = CoreLabel(text=clean_text, font_size=sp(font_size_sp), text_size=(bubble_text_w, None))
+        win_w = Window.width / dp(1) if (Window and getattr(Window, "width", 0) > 0) else 380
+        avail_w = win_w - 16 - (38 if not is_outgoing else 0)
+        bubble_text_w = max(160, int(avail_w * 0.85)) - 24
+        core = CoreLabel(text=clean_text, font_size=sp(font_size_sp), text_size=(dp(bubble_text_w), None))
         core.refresh()
         if core.texture and core.texture.size[1] > 0:
             return int(core.texture.size[1] / dp(1))
@@ -153,7 +153,7 @@ def _measure_text_height(text: str, font_size_sp: int = 15, is_outgoing: bool = 
         pass
 
     # Thread-safe accurate fallback matching Kivy Label's 15sp line height (18dp)
-    limit = 32 if is_outgoing else 28
+    limit = 38 if is_outgoing else 33
     total_lines = 0
     for para in clean_text.split("\n"):
         if not para:
@@ -188,7 +188,7 @@ def get_text_width_dp(text: str, font_size_sp: int = 15, bold: bool = False) -> 
             return c.texture.size[0] / dp(1)
     except Exception:
         pass
-    char_factor = 9.0 if bold else 8.5
+    char_factor = 9.2 if bold else 8.8
     return len(text) * (char_factor * (font_size_sp / 15.0))
 
 
@@ -202,6 +202,8 @@ def check_time_needs_own_line(text: str, is_outgoing: bool = False, max_w_dp: Op
     clean_text = clean_message_text(text)
     time_space_dp = 58.0 if is_outgoing else 44.0
     lines = clean_text.split("\n")
+    if not lines:
+        return False
     last_paragraph = lines[-1].strip()
     if not last_paragraph:
         return False
@@ -214,7 +216,12 @@ def check_time_needs_own_line(text: str, is_outgoing: bool = False, max_w_dp: Op
         except Exception:
             win_w = 380
         avatar_space = 38 if not is_outgoing else 0
-        max_w_dp = (win_w - 16 - avatar_space) * 0.78 - 24
+        max_w_dp = (win_w - 16 - avatar_space) * 0.85 - 24
+
+    # If single-line message: check directly if text + timestamp fits inside max_w_dp!
+    if len(lines) == 1:
+        single_w = get_text_width_dp(lines[0], 15)
+        return (single_w + time_space_dp) > max_w_dp
 
     words = last_paragraph.split(" ")
     cur_line_words = []
@@ -248,7 +255,7 @@ def check_time_needs_own_line(text: str, is_outgoing: bool = False, max_w_dp: Op
         return (last_w_dp + time_space_dp) > max_w_dp
     except Exception:
         # Thread-safe character-based fallback with word boundary tracking
-        limit = 32 if is_outgoing else 28
+        limit = 38 if is_outgoing else 33
         time_chars = 8 if is_outgoing else 6
         cur = 0
         for w in words:
@@ -378,7 +385,7 @@ def estimate_bubble_width(
 
     avatar_space = 38 if (not is_outgoing and (is_group_chat or sender_name)) else 0
     avail_w = win_w - 16 - avatar_space
-    max_bubble_w = max(160, int(avail_w * 0.78))
+    max_bubble_w = max(160, int(avail_w * 0.85))
 
     clean_text = clean_message_text(text) if text else ""
     has_text = bool(clean_text.strip())
@@ -402,7 +409,7 @@ def estimate_bubble_width(
         return max_bubble_w
 
     padding_w = 24  # 12dp left + 12dp right
-    # Generous margin (+30dp) for sender name ensures that if sender name is wider than text,
+    # Generous margin (+6dp) for sender name ensures that if sender name is wider than text,
     # the entire full name fits comfortably on a single line inside the bubble without word-wrapping.
     sender_w = int(get_text_width_dp(sender_name, 12, bold=True) + padding_w + 6) if (sender_name and not is_outgoing) else 0
 
@@ -410,13 +417,19 @@ def estimate_bubble_width(
         lines = clean_text.split("\n")
         time_space = 58 if is_outgoing else 44
         if len(lines) == 1:
-            line_w = int(get_text_width_dp(lines[0], 15) + (time_space if not time_needs_own_line else 0))
-            text_w = line_w + padding_w
+            line_txt_w = get_text_width_dp(lines[0], 15)
+            if not time_needs_own_line:
+                # Text and timestamp fit on 1 line: include time_space + 10dp safety margin
+                line_w = int(line_txt_w + time_space + 10)
+                text_w = min(max_bubble_w, line_w + padding_w)
+            else:
+                line_w = int(line_txt_w + 10)
+                text_w = min(max_bubble_w, line_w + padding_w)
         else:
             max_l = max(get_text_width_dp(l, 15) for l in lines)
             last_l = get_text_width_dp(lines[-1], 15)
-            if not time_needs_own_line and (last_l + time_space + padding_w) <= max_bubble_w:
-                text_w = int(max(max_l + padding_w, last_l + time_space + padding_w))
+            if not time_needs_own_line and (last_l + time_space + 10 + padding_w) <= max_bubble_w:
+                text_w = int(max(max_l + 10 + padding_w, last_l + time_space + 10 + padding_w))
             else:
                 text_w = max_bubble_w
     else:
