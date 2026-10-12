@@ -64,15 +64,19 @@ class CircularAvatar(RelativeLayout):
 
     def _load_avatar(self, url: str):
         if not url:
-            self.local_source = ""
+            if self.local_source:
+                self.local_source = ""
             return
             
         local = media_cache.get_local_path(url)
         if local:
-            self.local_source = local
+            if self.local_source != local:
+                self.local_source = local
         else:
-            self.local_source = ""
+            if self.local_source != "":
+                self.local_source = ""
             def _on_ready(local_path: str, target_url=url):
                 if local_path and self.source == target_url and not local_path.startswith("http"):
-                    self.local_source = local_path
+                    if self.local_source != local_path:
+                        self.local_source = local_path
             media_cache.fetch_image_async(url, on_ready=_on_ready)

@@ -143,6 +143,14 @@ class DatabaseManager:
             except Exception:
                 pass
             try:
+                await db.execute("ALTER TABLE users ADD COLUMN photo_100 TEXT")
+            except Exception:
+                pass
+            try:
+                await db.execute("ALTER TABLE users ADD COLUMN photo_200 TEXT")
+            except Exception:
+                pass
+            try:
                 await db.execute("ALTER TABLE messages ADD COLUMN sender_name TEXT")
             except Exception:
                 pass

@@ -163,14 +163,6 @@
 
 
 <PhotoItem>:
-    canvas.before:
-        Color:
-            rgba: (0.16, 0.18, 0.22, 0.5)
-        RoundedRectangle:
-            pos: self.pos
-            size: self.size
-            radius: root.radius
-
     FitImage:
         source: root.local_source
         size_hint: (1, 1)

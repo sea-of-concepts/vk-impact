@@ -674,36 +674,40 @@ class ChatViewModel(BaseViewModel):
                 curr["sender_avatar"] = full_av if is_last else ""
                 curr["show_avatar"] = bool(is_last and full_av)
 
-            # Recalculate bubble_width and height with updated sender_name
-            t = curr.get("text", "")
-            photos = curr.get("photos", [])
-            reply = curr.get("reply_message")
-            fwds = curr.get("fwd_messages", [])
-            fwd_texts = [f.get("text", "") for f in fwds if isinstance(f, dict)]
-            time_own = curr.get("time_needs_own_line", False)
+            # Recalculate bubble_width and height only if sender_name changed or size not yet calculated
+            old_sn = curr.get("_last_calc_sender_name")
+            new_sn = curr.get("sender_name", "")
+            if curr.get("bubble_width") is None or curr.get("msg_size") is None or old_sn != new_sn:
+                curr["_last_calc_sender_name"] = new_sn
+                t = curr.get("text", "")
+                photos = curr.get("photos", [])
+                reply = curr.get("reply_message")
+                fwds = curr.get("fwd_messages", [])
+                fwd_texts = [f.get("text", "") for f in fwds if isinstance(f, dict)]
+                time_own = curr.get("time_needs_own_line", False)
 
-            bw = estimate_bubble_width(
-                text=t,
-                photos=photos,
-                sender_name=curr.get("sender_name", ""),
-                has_reply=bool(reply),
-                has_fwd=bool(fwds),
-                time_needs_own_line=time_own,
-                is_outgoing=is_out,
-                is_group_chat=is_group
-            )
-            curr["bubble_width"] = dp(bw)
+                bw = estimate_bubble_width(
+                    text=t,
+                    photos=photos,
+                    sender_name=new_sn,
+                    has_reply=bool(reply),
+                    has_fwd=bool(fwds),
+                    time_needs_own_line=time_own,
+                    is_outgoing=is_out,
+                    is_group_chat=is_group
+                )
+                curr["bubble_width"] = dp(bw)
 
-            h = estimate_message_height(
-                t,
-                has_sender_name=bool(curr.get("sender_name")),
-                has_reply=bool(reply),
-                fwd_count=len(fwds),
-                fwd_texts=fwd_texts,
-                time_needs_own_line=time_own,
-                photos=photos
-            )
-            curr["msg_size"] = [None, dp(h + (28 if curr.get("show_new_divider") else 0))]
+                h = estimate_message_height(
+                    t,
+                    has_sender_name=bool(new_sn),
+                    has_reply=bool(reply),
+                    fwd_count=len(fwds),
+                    fwd_texts=fwd_texts,
+                    time_needs_own_line=time_own,
+                    photos=photos
+                )
+                curr["msg_size"] = [None, dp(h + (28 if curr.get("show_new_divider") else 0))]
 
         return messages
 

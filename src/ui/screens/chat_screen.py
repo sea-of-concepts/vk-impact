@@ -164,15 +164,6 @@ class ChatScreen(MDScreen):
 
     def _update_viewport_read_status(self, scroll_y: float):
         """Updates highest_read_cmid for messages in viewport and computes unread_below_count."""
-        rv = self.ids.get("rv_messages")
-        if not rv or not self.vm.messages:
-            return
-
-        spacing = dp(6)
-        padding_top = dp(8)
-        padding_bottom = dp(8)
-        v_h = rv.height or dp(600)
-
         if scroll_y <= 0.03:
             self.is_at_bottom = True
             self.vm.unread_below_count = 0
@@ -184,9 +175,22 @@ class ChatScreen(MDScreen):
                 m["is_read"] = True
                 if not m.get("is_outgoing", False):
                     self.vm._read_message_ids.add(m.get("message_id", 0))
+            Clock.unschedule(self._do_viewport_read_update)
             return
 
         self.is_at_bottom = False
+        Clock.unschedule(self._do_viewport_read_update)
+        Clock.schedule_once(lambda dt: self._do_viewport_read_update(scroll_y), 0.12)
+
+    def _do_viewport_read_update(self, scroll_y: float):
+        rv = self.ids.get("rv_messages")
+        if not rv or not self.vm.messages:
+            return
+
+        spacing = dp(6)
+        padding_top = dp(8)
+        padding_bottom = dp(8)
+        v_h = rv.height or dp(600)
 
         total_h = sum(
             (m.get("msg_size", [None, dp(64)])[1] or dp(64)) + spacing
@@ -249,19 +253,20 @@ class ChatScreen(MDScreen):
                         for m in rv_older
                     )
                     h_new = h_old + h_prepended
+                    merged = self.vm._apply_grouping(rv_older + list(self.vm.messages))
                     if h_old > v_h and h_new > v_h:
                         pos_from_bottom = curr_sy * (h_old - v_h)
                         new_scroll_y = max(0.0, min(1.0, pos_from_bottom / (h_new - v_h)))
                         if getattr(rv, "_anim_y", None):
                             rv._anim_y.stop(rv)
                             rv._anim_y = None
-                        self.vm.messages = rv_older + list(self.vm.messages)
+                        self.vm.messages = merged
                         rv.scroll_y = new_scroll_y
                         if hasattr(rv, "_update_effect_y_bounds"):
                             rv._update_effect_y_bounds()
                         Clock.schedule_once(lambda dt: setattr(rv, "scroll_y", new_scroll_y), 0)
                     else:
-                        self.vm.messages = rv_older + list(self.vm.messages)
+                        self.vm.messages = merged
 
             self.vm.load_older_messages(on_data_ready=_on_older_ready)
 
@@ -279,19 +284,20 @@ class ChatScreen(MDScreen):
                         for m in rv_newer
                     )
                     h_new = h_old + h_appended
+                    merged = self.vm._apply_grouping(list(self.vm.messages) + rv_newer)
                     if h_old > v_h and h_new > v_h:
                         offset_top = (1.0 - curr_sy) * (h_old - v_h)
                         new_scroll_y = max(0.0, min(1.0, 1.0 - (offset_top / (h_new - v_h))))
                         if getattr(rv, "_anim_y", None):
                             rv._anim_y.stop(rv)
                             rv._anim_y = None
-                        self.vm.messages = list(self.vm.messages) + rv_newer
+                        self.vm.messages = merged
                         rv.scroll_y = new_scroll_y
                         if hasattr(rv, "_update_effect_y_bounds"):
                             rv._update_effect_y_bounds()
                         Clock.schedule_once(lambda dt: setattr(rv, "scroll_y", new_scroll_y), 0)
                     else:
-                        self.vm.messages = list(self.vm.messages) + rv_newer
+                        self.vm.messages = merged
 
             self.vm.load_newer_messages(on_data_ready=_on_newer_ready)
 

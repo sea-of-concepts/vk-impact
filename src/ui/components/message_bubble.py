@@ -39,11 +39,13 @@ class PhotoItem(RelativeLayout):
             return
         local = media_cache.get_local_path(self.url)
         if local:
-            self.local_source = local
+            if self.local_source != local:
+                self.local_source = local
         else:
-            self.local_source = ""
+            if self.local_source != "":
+                self.local_source = ""
             def _on_ready(path, target_url=self.url):
-                if path and self.url == target_url:
+                if path and self.url == target_url and self.local_source != path:
                     self.local_source = path
             media_cache.fetch_image_async(self.url, on_ready=_on_ready)
 
@@ -96,6 +98,8 @@ class MessageBubble(RecycleDataViewBehavior, BoxLayout):
         self._touch_start_y = 0
         self._is_swiping = False
         self.rv = None
+        self._rendered_photos = None
+        self._rendered_fwds = None
 
     def refresh_view_attrs(self, rv, index, data):
         self.index = index
@@ -140,7 +144,6 @@ class MessageBubble(RecycleDataViewBehavior, BoxLayout):
             self.height = real_h
             if self.rv and self.index is not None and self.index < len(self.rv.data):
                 self.rv.data[self.index]["msg_size"] = [None, real_h]
-                Clock.schedule_once(lambda _dt: self.rv.refresh_from_data(), 0)
 
     def on_photos(self, instance, value):
         self.rebuild_photos(value)
@@ -149,6 +152,9 @@ class MessageBubble(RecycleDataViewBehavior, BoxLayout):
         container = self.ids.get("photos_container")
         if not container:
             return
+        if self._rendered_photos == photos:
+            return
+        self._rendered_photos = list(photos) if isinstance(photos, list) else []
         container.clear_widgets()
         if not photos or not isinstance(photos, list):
             return
@@ -280,6 +286,9 @@ class MessageBubble(RecycleDataViewBehavior, BoxLayout):
         container = self.ids.get("fwd_container")
         if not container:
             return
+        if self._rendered_fwds == fwds:
+            return
+        self._rendered_fwds = list(fwds) if isinstance(fwds, list) else []
         container.clear_widgets()
         if not fwds or not isinstance(fwds, list):
             return
