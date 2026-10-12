@@ -273,8 +273,9 @@
 
         # Left spacer for outgoing messages
         Widget:
+            id: left_spacer
             size_hint_x: 1 if root.is_outgoing else None
-            width: 0
+            width: 0 if not root.is_outgoing else 0
             opacity: 0
 
         # Small sender avatar for incoming messages in group chats
@@ -282,17 +283,17 @@
             id: avatar_widget
             source: root.sender_avatar
             peer_id: root.from_id
-            size_dp: 32 if (not root.is_outgoing and (root.is_group_chat or root.sender_avatar)) else 0
+            size_dp: 32 if (not root.is_outgoing and root.is_group_chat) else 0
             size_hint: None, None
-            size: (dp(32), dp(32)) if (not root.is_outgoing and (root.is_group_chat or root.sender_avatar)) else (0, 0)
-            opacity: 1 if (not root.is_outgoing and (root.is_group_chat or root.sender_avatar)) else 0
-            disabled: not (not root.is_outgoing and (root.is_group_chat or root.sender_avatar))
+            size: (dp(32), dp(32)) if (not root.is_outgoing and root.is_group_chat) else (0, 0)
+            opacity: 1 if (not root.is_outgoing and root.show_avatar) else 0
+            disabled: not (not root.is_outgoing and root.show_avatar)
             pos_hint: {"y": 0}
             impact_style: root.sender_impact_style
 
         Widget:
             size_hint: None, None
-            size: (dp(6), dp(1)) if (not root.is_outgoing and (root.is_group_chat or root.sender_avatar)) else (0, 0)
+            size: (dp(6), dp(1)) if (not root.is_outgoing and root.is_group_chat) else (0, 0)
             opacity: 0
 
         # Bubble container
@@ -300,11 +301,11 @@
             id: content_box
             orientation: "vertical"
             size_hint_x: None
-            width: min(root.bubble_width, root.width - dp(16) - (dp(38) if (not root.is_outgoing and (root.is_group_chat or root.sender_avatar)) else 0))
+            width: min(root.bubble_width, root.width - dp(16) - (dp(38) if (not root.is_outgoing and root.is_group_chat) else 0))
             size_hint_y: None
             height: self.minimum_height
-            padding: [dp(2), dp(2), dp(2), dp(2)] if (root.photos and not root.text and not root.sender_name and not root.reply_message and not root.fwd_messages) else [dp(14), dp(4), dp(14), dp(4)]
-            spacing: dp(2)
+            padding: [dp(2), dp(2), dp(2), dp(2)] if (root.photos and not root.text and not root.sender_name and not root.reply_message and not root.fwd_messages) else [dp(12), dp(3), dp(12), dp(3)]
+            spacing: 0
             pos_hint: {"y": 0}
             canvas.before:
                 Color:
@@ -322,10 +323,10 @@
                 font_size: "12sp"
                 text_size: (self.width, None)
                 size_hint_y: None
-                height: dp(15) if (root.sender_name and not root.is_outgoing) else 0
+                height: dp(14) if (root.sender_name and not root.is_outgoing) else 0
                 opacity: 1 if (root.sender_name and not root.is_outgoing) else 0
                 halign: "left"
-                valign: "middle"
+                valign: "top"
 
             # Reply Preview Box (image 2)
             BoxLayout:
@@ -399,7 +400,7 @@
             RelativeLayout:
                 id: text_container
                 size_hint_y: None
-                height: max(dp(14), (msg_label.height if root.text else 0) + (dp(13) if root.time_needs_own_line else 0)) if (root.text or not root.photos) else 0
+                height: max(dp(14), (msg_label.height if root.text else 0) + (dp(12) if root.time_needs_own_line else 0)) if (root.text or not root.photos) else 0
                 opacity: 1 if (root.text or not root.photos) else 0
                 disabled: not (root.text or not root.photos)
 
@@ -448,8 +449,9 @@
 
         # Right spacer for incoming messages
         Widget:
+            id: right_spacer
             size_hint_x: None if root.is_outgoing else 1
-            width: 0
+            width: 0 if root.is_outgoing else 0
             opacity: 0
 
 

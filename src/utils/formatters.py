@@ -175,7 +175,23 @@ def _measure_text_height(text: str, font_size_sp: int = 15, is_outgoing: bool = 
     return total_lines * line_h
 
 
-def check_time_needs_own_line(text: str, is_outgoing: bool = False, max_w_dp: float = 235.0) -> bool:
+def get_text_width_dp(text: str, font_size_sp: int = 15) -> float:
+    """Measures exact width of a single-line string in dp using Kivy CoreLabel."""
+    if not text:
+        return 0.0
+    try:
+        from kivy.core.text import Label as CoreLabel
+        from kivy.metrics import sp, dp
+        c = CoreLabel(text=text, font_size=sp(font_size_sp))
+        c.refresh()
+        if c.texture and c.texture.size[0] > 0:
+            return c.texture.size[0] / dp(1)
+    except Exception:
+        pass
+    return len(text) * 8.5
+
+
+def check_time_needs_own_line(text: str, is_outgoing: bool = False, max_w_dp: Optional[float] = None) -> bool:
     """
     Returns True if the last line of text is too wide to fit the timestamp inline,
     requiring a separate row below the text.
@@ -183,11 +199,21 @@ def check_time_needs_own_line(text: str, is_outgoing: bool = False, max_w_dp: fl
     if not text:
         return False
     clean_text = clean_message_text(text)
-    time_space_dp = 54.0 if is_outgoing else 40.0
+    time_space_dp = 58.0 if is_outgoing else 44.0
     lines = clean_text.split("\n")
     last_paragraph = lines[-1].strip()
     if not last_paragraph:
         return False
+
+    if max_w_dp is None:
+        try:
+            from kivy.core.window import Window
+            from kivy.metrics import dp
+            win_w = Window.width / dp(1) if (Window and getattr(Window, "width", 0) > 0) else 380
+        except Exception:
+            win_w = 380
+        avatar_space = 38 if not is_outgoing else 0
+        max_w_dp = (win_w - 16 - avatar_space) * 0.78 - 24
 
     words = last_paragraph.split(" ")
     cur_line_words = []
@@ -365,7 +391,7 @@ def estimate_bubble_width(
         ar = photos[0].get("aspect_ratio", 1.33) if photos else 1.33
         h = max(130, min(260, 240 / ar if ar > 0 else 180))
         single_p_w = int(h * ar)
-        req_w = min(max_bubble_w, max(180, single_p_w + (4 if not has_text else 28)))
+        req_w = min(max_bubble_w, max(180, single_p_w + (4 if not has_text else 24)))
         if not has_text:
             return req_w
     else:
@@ -374,19 +400,20 @@ def estimate_bubble_width(
     if has_fwd or has_reply:
         return max_bubble_w
 
-    padding_w = 28
-    sender_w = int(len(sender_name) * 8.0 + padding_w) if (sender_name and not is_outgoing) else 0
+    padding_w = 24  # 12dp left + 12dp right
+    sender_w = int(get_text_width_dp(sender_name, 12) + padding_w) if (sender_name and not is_outgoing) else 0
 
     if has_text:
         lines = clean_text.split("\n")
-        time_space = 52 if is_outgoing else 38
+        time_space = 58 if is_outgoing else 44
         if len(lines) == 1:
-            line_w = int(len(lines[0]) * 7.5 + (time_space if not time_needs_own_line else 0))
+            line_w = int(get_text_width_dp(lines[0], 15) + (time_space if not time_needs_own_line else 0))
             text_w = line_w + padding_w
         else:
-            max_line_len = max(len(l) for l in lines)
-            if (max_line_len * 7.5 + padding_w) < max_bubble_w:
-                text_w = int(max_line_len * 7.5 + padding_w)
+            max_l = max(get_text_width_dp(l, 15) for l in lines)
+            last_l = get_text_width_dp(lines[-1], 15)
+            if not time_needs_own_line and (last_l + time_space + padding_w) <= max_bubble_w:
+                text_w = int(max(max_l + padding_w, last_l + time_space + padding_w))
             else:
                 text_w = max_bubble_w
     else:
@@ -420,10 +447,10 @@ def estimate_message_height(
     if has_photos and not has_text and not has_sender_name:
         base_padding = 8
     else:
-        base_padding = 12  # content_box vertical padding (8) + bubble_row padding (4)
+        base_padding = 10  # content_box vertical padding (6) + bubble_row padding (4)
 
     if has_sender_name:
-        base_padding += 17  # Sender name header (15) + spacing (2)
+        base_padding += 16  # Sender name header (14) + gap (2)
 
     if has_reply:
         base_padding += 38  # Reply preview box (36) + spacing (2)

@@ -88,6 +88,7 @@ class MessageBubble(RecycleDataViewBehavior, BoxLayout):
     swipe_x = NumericProperty(0)
     time_needs_own_line = BooleanProperty(False)
     bubble_width = NumericProperty(dp(220))
+    show_avatar = BooleanProperty(True)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -108,8 +109,13 @@ class MessageBubble(RecycleDataViewBehavior, BoxLayout):
         self.bubble_width = data.get("bubble_width", dp(220))
         self.from_id = data.get("from_id", 0)
         self.is_group_chat = bool(data.get("is_group_chat", False))
+        self.show_avatar = bool(data.get("show_avatar", True))
         self.time_needs_own_line = bool(data.get("time_needs_own_line", False))
         self.photos = data.get("photos", [])
+        if "left_spacer" in self.ids:
+            self.ids.left_spacer.width = 0
+        if "right_spacer" in self.ids:
+            self.ids.right_spacer.width = 0
         self.update_display_text()
         self.update_colors()
         self.rebuild_photos(self.photos)
@@ -123,12 +129,7 @@ class MessageBubble(RecycleDataViewBehavior, BoxLayout):
         if not self.text:
             self.display_text = ""
             return
-        t = clean_message_text(self.text)
-        if not self.time_needs_own_line:
-            # Append non-breaking margin so text never collides with inline timestamp
-            self.display_text = t + ("       " if self.is_outgoing else "     ")
-        else:
-            self.display_text = t
+        self.display_text = clean_message_text(self.text)
 
     def _sync_rendered_height(self, dt=0):
         c_box = self.ids.get("content_box")

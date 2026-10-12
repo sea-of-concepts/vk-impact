@@ -215,7 +215,7 @@ class ChatViewModel(BaseViewModel):
             if on_data_ready:
                 on_data_ready(rv_older)
             else:
-                self.messages = rv_older + list(self.messages)
+                self.messages = self._apply_grouping(rv_older + list(self.messages))
 
         def _on_error(exc):
             self.is_loading_history = False
@@ -267,7 +267,7 @@ class ChatViewModel(BaseViewModel):
             if on_data_ready:
                 on_data_ready(rv_newer)
             else:
-                self.messages = list(self.messages) + rv_newer
+                self.messages = self._apply_grouping(list(self.messages) + rv_newer)
 
         def _on_error(exc):
             self.is_loading_history = False
@@ -351,11 +351,15 @@ class ChatViewModel(BaseViewModel):
         opt_item = {
             "message_id": temp_id,
             "from_id": 0,
+            "date": now,
             "is_group_chat": (self.peer_id >= 2000000000 or self.peer_id < 0),
             "text": text,
             "photos": [],
+            "full_sender_name": "",
             "sender_name": "",
+            "full_sender_avatar": "",
             "sender_avatar": "",
+            "show_avatar": False,
             "sender_impact_style": "",
             "time_text": format_timestamp(now),
             "is_outgoing": True,
@@ -367,7 +371,7 @@ class ChatViewModel(BaseViewModel):
             "bubble_width": dp(bw),
             "msg_size": [None, dp(height)]
         }
-        self.messages = list(self.messages) + [opt_item]
+        self.messages = self._apply_grouping(list(self.messages) + [opt_item])
 
         # Emit to EventBus so DialogsViewModel and any observers update the last message immediately!
         event_bus.emit(
@@ -458,7 +462,9 @@ class ChatViewModel(BaseViewModel):
                     for msg in self.messages:
                         if msg.get("from_id") == uid or msg.get("message_id") == msg_id or (msg.get("sender_name") == f"ID {uid}"):
                             m_copy = dict(msg)
+                            m_copy["full_sender_name"] = full_n
                             m_copy["sender_name"] = full_n
+                            m_copy["full_sender_avatar"] = av
                             m_copy["sender_avatar"] = av
                             m_copy["sender_impact_style"] = st
 
@@ -494,7 +500,7 @@ class ChatViewModel(BaseViewModel):
                         else:
                             new_messages.append(msg)
                     if updated:
-                        self.messages = new_messages
+                        self.messages = self._apply_grouping(new_messages)
                 Clock.schedule_once(_apply, 0)
         run_async(_fetch())
 
@@ -570,11 +576,15 @@ class ChatViewModel(BaseViewModel):
             return {
                 "message_id": m.id,
                 "from_id": m.from_id,
+                "date": getattr(m, "date", 0),
                 "is_group_chat": (self.peer_id >= 2000000000 or self.peer_id < 0),
                 "text": raw_text,
                 "photos": photos,
+                "full_sender_name": sender_name,
                 "sender_name": sender_name,
+                "full_sender_avatar": sender_avatar,
                 "sender_avatar": sender_avatar,
+                "show_avatar": bool(sender_avatar),
                 "sender_impact_style": sender_style,
                 "time_text": format_timestamp(m.date),
                 "is_outgoing": m.is_outgoing,
@@ -592,10 +602,14 @@ class ChatViewModel(BaseViewModel):
             return {
                 "message_id": getattr(m, "id", 0),
                 "from_id": getattr(m, "from_id", 0),
+                "date": getattr(m, "date", 0),
                 "text": clean_message_text(str(getattr(m, "text", "") or "")),
                 "photos": [],
+                "full_sender_name": "",
                 "sender_name": "",
+                "full_sender_avatar": "",
                 "sender_avatar": "",
+                "show_avatar": False,
                 "sender_impact_style": "",
                 "time_text": "",
                 "is_outgoing": getattr(m, "is_outgoing", False),
@@ -606,6 +620,92 @@ class ChatViewModel(BaseViewModel):
                 "bubble_width": dp(220),
                 "msg_size": [None, dp(64)]
             }
+
+    def _apply_grouping(self, messages: List[dict]) -> List[dict]:
+        """
+        Applies VK-style message grouping for consecutive messages:
+        - First message in a group shows sender_name (nickname in group chats).
+        - Last message in a group shows sender_avatar (at the bottom next to the sharp corner).
+        - Middle messages show neither.
+        - Single messages show both.
+        - Recalculates exact bubble_width and msg_size height to reflect whether sender_name is present.
+        """
+        if not messages:
+            return messages
+
+        is_group = bool(self.peer_id >= 2000000000 or self.peer_id < 0)
+        n = len(messages)
+
+        for i in range(n):
+            curr = messages[i]
+            is_out = curr.get("is_outgoing", False)
+
+            if is_out or not is_group:
+                curr["show_avatar"] = False
+                curr["sender_name"] = ""
+                curr["show_sender_name"] = False
+            else:
+                prev = messages[i - 1] if i > 0 else None
+                nxt = messages[i + 1] if i < n - 1 else None
+
+                is_first = (
+                    prev is None
+                    or prev.get("is_outgoing", False)
+                    or prev.get("from_id") != curr.get("from_id")
+                    or curr.get("show_new_divider", False)
+                    or abs(curr.get("date", 0) - prev.get("date", 0)) > 300
+                )
+
+                is_last = (
+                    nxt is None
+                    or nxt.get("is_outgoing", False)
+                    or nxt.get("from_id") != curr.get("from_id")
+                    or nxt.get("show_new_divider", False)
+                    or abs(nxt.get("date", 0) - curr.get("date", 0)) > 300
+                )
+
+                full_name = curr.get("full_sender_name") or curr.get("sender_name", "")
+                curr["full_sender_name"] = full_name
+                curr["sender_name"] = full_name if is_first else ""
+                curr["show_sender_name"] = is_first
+
+                full_av = curr.get("full_sender_avatar") or curr.get("sender_avatar", "")
+                curr["full_sender_avatar"] = full_av
+                curr["sender_avatar"] = full_av if is_last else ""
+                curr["show_avatar"] = bool(is_last and full_av)
+
+            # Recalculate bubble_width and height with updated sender_name
+            t = curr.get("text", "")
+            photos = curr.get("photos", [])
+            reply = curr.get("reply_message")
+            fwds = curr.get("fwd_messages", [])
+            fwd_texts = [f.get("text", "") for f in fwds if isinstance(f, dict)]
+            time_own = curr.get("time_needs_own_line", False)
+
+            bw = estimate_bubble_width(
+                text=t,
+                photos=photos,
+                sender_name=curr.get("sender_name", ""),
+                has_reply=bool(reply),
+                has_fwd=bool(fwds),
+                time_needs_own_line=time_own,
+                is_outgoing=is_out,
+                is_group_chat=is_group
+            )
+            curr["bubble_width"] = dp(bw)
+
+            h = estimate_message_height(
+                t,
+                has_sender_name=bool(curr.get("sender_name")),
+                has_reply=bool(reply),
+                fwd_count=len(fwds),
+                fwd_texts=fwd_texts,
+                time_needs_own_line=time_own,
+                photos=photos
+            )
+            curr["msg_size"] = [None, dp(h + (28 if curr.get("show_new_divider") else 0))]
+
+        return messages
 
     def _update_messages_list(self, items: List[VKMessage]):
         """Formats message list with pre-calculated static heights in chronological order (oldest to newest)."""
@@ -622,7 +722,7 @@ class ChatViewModel(BaseViewModel):
             is_first_unread = (idx == first_unread_idx and self.initial_unread_count > 0)
             is_unread = (idx >= first_unread_idx and not m.is_outgoing and self.initial_unread_count > 0 and m.id not in self._read_message_ids)
             rv_data.append(self._format_message_for_rv(m, is_first_unread=is_first_unread, is_unread=is_unread))
-        self.messages = rv_data
+        self.messages = self._apply_grouping(rv_data)
 
     def load_history_around_message(self, message_id: int, on_complete=None):
         """Loads chat history centered around a target message (for jump-to-reply)."""
@@ -888,11 +988,15 @@ class ChatViewModel(BaseViewModel):
         new_item = {
             "message_id": message_id,
             "from_id": from_id,
+            "date": timestamp,
             "is_group_chat": (self.peer_id >= 2000000000 or self.peer_id < 0),
             "text": clean_text,
             "photos": photos,
+            "full_sender_name": sender_name,
             "sender_name": sender_name,
+            "full_sender_avatar": sender_avatar,
             "sender_avatar": sender_avatar,
+            "show_avatar": bool(sender_avatar),
             "sender_impact_style": sender_style,
             "time_text": format_timestamp(timestamp),
             "is_outgoing": is_out,
@@ -904,7 +1008,7 @@ class ChatViewModel(BaseViewModel):
             "bubble_width": dp(bw),
             "msg_size": [None, dp(height)]
         }
-        self.messages = list(self.messages) + [new_item]
+        self.messages = self._apply_grouping(list(self.messages) + [new_item])
         
         if not is_out:
             self.run_task(messages_repo.mark_as_read(self.peer_id, start_message_id=message_id), show_loader=False)
