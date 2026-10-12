@@ -32,6 +32,7 @@ class ChatScreen(MDScreen):
         """Initializes chat viewmodel for the selected conversation."""
         self._has_scrolled_to_initial = False
         self.is_at_bottom = True
+        self._prev_messages = []
         self.vm.open_chat(
             peer_id=peer_id,
             title=title,
@@ -42,9 +43,73 @@ class ChatScreen(MDScreen):
         )
 
     def _on_messages_changed(self, *args):
-        """Scrolls to the boundary of read/unread messages or bottom upon initial load."""
-        if not self._has_scrolled_to_initial and self.vm.messages:
+        """Handles changes in messages: initial positioning, bottom pinning, and viewport offset preservation when scrolled up."""
+        rv = self.ids.get("rv_messages")
+        current_messages = list(self.vm.messages)
+
+        if not self._has_scrolled_to_initial and current_messages:
+            self._prev_messages = current_messages
             Clock.schedule_once(lambda dt: self.scroll_to_unread_or_bottom(), 0.05)
+            return
+
+        if not rv or not current_messages:
+            self._prev_messages = current_messages
+            return
+
+        prev_messages = getattr(self, "_prev_messages", [])
+        self._prev_messages = current_messages
+
+        if not prev_messages or getattr(self.vm, "is_loading_history", False):
+            return
+
+        old_len = len(prev_messages)
+        new_len = len(current_messages)
+
+        # Check if messages were appended at the bottom
+        if new_len > old_len and prev_messages[0].get("message_id") == current_messages[0].get("message_id"):
+            spacing = dp(6)
+            padding_top = dp(8)
+            padding_bottom = dp(8)
+            v_h = rv.height or dp(600)
+            curr_sy = rv.scroll_y
+
+            # 1. If user is currently at the bottom, keep them pinned at the bottom
+            if self.is_at_bottom or curr_sy <= 0.03:
+                self.is_at_bottom = True
+                def _stay_at_bottom(dt):
+                    if rv:
+                        rv.scroll_y = 0.0
+                        if hasattr(rv, "_update_effect_y_bounds"):
+                            rv._update_effect_y_bounds()
+                Clock.schedule_once(_stay_at_bottom, 0)
+                return
+
+            # 2. If user is scrolled up, compensate scroll_y so the pixel offset from top remains exactly identical
+            h_old = sum(
+                (m.get("msg_size", [None, dp(64)])[1] or dp(64)) + spacing
+                for m in prev_messages
+            ) + padding_top + padding_bottom
+
+            h_new = sum(
+                (m.get("msg_size", [None, dp(64)])[1] or dp(64)) + spacing
+                for m in current_messages
+            ) + padding_top + padding_bottom
+
+            if h_old > v_h and h_new > v_h:
+                offset_from_top = (1.0 - curr_sy) * (h_old - v_h)
+                new_scroll_y = max(0.0, min(1.0, 1.0 - (offset_from_top / (h_new - v_h))))
+
+                if getattr(rv, "_anim_y", None):
+                    rv._anim_y.stop(rv)
+                    rv._anim_y = None
+
+                rv.scroll_y = new_scroll_y
+                if hasattr(rv, "_update_effect_y_bounds"):
+                    rv._update_effect_y_bounds()
+                Clock.schedule_once(lambda dt: setattr(rv, "scroll_y", new_scroll_y), 0)
+
+            # Update unread badge counter for new messages appended below the visible viewport
+            self._update_viewport_read_status(rv.scroll_y)
 
     def scroll_to_unread_or_bottom(self):
         """Positions viewport at the first unread message if unread_count > 0, otherwise at the latest message."""
