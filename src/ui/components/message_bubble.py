@@ -87,6 +87,7 @@ class MessageBubble(RecycleDataViewBehavior, BoxLayout):
     nickname_color = ListProperty([1.0, 1.0, 1.0, 1.0])
     swipe_x = NumericProperty(0)
     time_needs_own_line = BooleanProperty(False)
+    bubble_width = NumericProperty(dp(220))
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -104,6 +105,7 @@ class MessageBubble(RecycleDataViewBehavior, BoxLayout):
         sz = data.get("msg_size")
         if sz and sz[1]:
             self.height = sz[1]
+        self.bubble_width = data.get("bubble_width", dp(220))
         self.from_id = data.get("from_id", 0)
         self.is_group_chat = bool(data.get("is_group_chat", False))
         self.time_needs_own_line = bool(data.get("time_needs_own_line", False))
@@ -171,80 +173,68 @@ class MessageBubble(RecycleDataViewBehavior, BoxLayout):
                 show_time_badge=show_time_badge
             )
             container.add_widget(item)
+            return
 
-        elif n == 2:
-            row = BoxLayout(orientation="horizontal", spacing=dp(3), size_hint=(1, None), height=dp(140))
-            p1 = PhotoItem(url=photos[0].get("url", ""), size_hint=(0.5, 1), radius=[dp(12), dp(12), dp(12), dp(12)])
-            p2 = PhotoItem(
-                url=photos[1].get("url", ""),
-                size_hint=(0.5, 1),
-                radius=[dp(12), dp(12), dp(12), dp(12)],
-                time_text=self.time_text,
-                is_outgoing=self.is_outgoing,
-                is_read=self.is_read,
-                show_time_badge=show_time_badge
-            )
-            row.add_widget(p1)
-            row.add_widget(p2)
-            container.add_widget(row)
-
+        # Multi-photo collage row splitting matching VK clients
+        if n == 2:
+            row_splits = [2]
+            row_heights = [170]
         elif n == 3:
-            p1 = PhotoItem(url=photos[0].get("url", ""), size_hint=(1, None), height=dp(125), radius=[dp(12), dp(12), dp(12), dp(12)])
-            container.add_widget(p1)
-            row2 = BoxLayout(orientation="horizontal", spacing=dp(3), size_hint=(1, None), height=dp(95))
-            p2 = PhotoItem(url=photos[1].get("url", ""), size_hint=(0.5, 1), radius=[dp(12), dp(12), dp(12), dp(12)])
-            p3 = PhotoItem(
-                url=photos[2].get("url", ""),
-                size_hint=(0.5, 1),
-                radius=[dp(12), dp(12), dp(12), dp(12)],
-                time_text=self.time_text,
-                is_outgoing=self.is_outgoing,
-                is_read=self.is_read,
-                show_time_badge=show_time_badge
-            )
-            row2.add_widget(p2)
-            row2.add_widget(p3)
-            container.add_widget(row2)
-
+            row_splits = [1, 2]
+            row_heights = [140, 105]
         elif n == 4:
-            row1 = BoxLayout(orientation="horizontal", spacing=dp(3), size_hint=(1, None), height=dp(100))
-            row1.add_widget(PhotoItem(url=photos[0].get("url", ""), size_hint=(0.5, 1), radius=[dp(10), dp(10), dp(10), dp(10)]))
-            row1.add_widget(PhotoItem(url=photos[1].get("url", ""), size_hint=(0.5, 1), radius=[dp(10), dp(10), dp(10), dp(10)]))
-            container.add_widget(row1)
+            row_splits = [2, 2]
+            row_heights = [115, 115]
+        elif n == 5:
+            row_splits = [2, 3]
+            row_heights = [115, 90]
+        elif n == 6:
+            row_splits = [3, 3]
+            row_heights = [100, 100]
+        elif n == 7:
+            row_splits = [3, 4]
+            row_heights = [100, 85]
+        elif n == 8:
+            row_splits = [4, 4]
+            row_heights = [90, 90]
+        elif n == 9:
+            row_splits = [3, 3, 3]
+            row_heights = [85, 85, 85]
+        else:  # 10 photos: 4 in top row, 6 in bottom row (Screenshot 4)
+            row_splits = [4, 6]
+            row_heights = [115, 85]
 
-            row2 = BoxLayout(orientation="horizontal", spacing=dp(3), size_hint=(1, None), height=dp(100))
-            row2.add_widget(PhotoItem(url=photos[2].get("url", ""), size_hint=(0.5, 1), radius=[dp(10), dp(10), dp(10), dp(10)]))
-            row2.add_widget(PhotoItem(
-                url=photos[3].get("url", ""),
-                size_hint=(0.5, 1),
-                radius=[dp(10), dp(10), dp(10), dp(10)],
-                time_text=self.time_text,
-                is_outgoing=self.is_outgoing,
-                is_read=self.is_read,
-                show_time_badge=show_time_badge
-            ))
-            container.add_widget(row2)
+        p_idx = 0
+        total_rows = len(row_splits)
+        for r_idx, (count, r_h) in enumerate(zip(row_splits, row_heights)):
+            row = BoxLayout(orientation="horizontal", spacing=dp(2), size_hint=(1, None), height=dp(r_h))
+            for c_i in range(count):
+                if p_idx >= n:
+                    break
+                p_item = photos[p_idx]
+                is_last_photo = (p_idx == n - 1)
+                is_first_row = (r_idx == 0)
+                is_last_row = (r_idx == total_rows - 1)
+                is_first_col = (c_i == 0)
+                is_last_col = (c_i == count - 1)
 
-        else:
-            chunk_size = 3 if n >= 6 else 2
-            idx = 0
-            while idx < n:
-                chunk = photos[idx:idx + chunk_size]
-                row = BoxLayout(orientation="horizontal", spacing=dp(3), size_hint=(1, None), height=dp(85))
-                for c_i, p_item in enumerate(chunk):
-                    is_last = (idx + c_i == n - 1)
-                    pi = PhotoItem(
-                        url=p_item.get("url", ""),
-                        size_hint=(1.0 / len(chunk), 1),
-                        radius=[dp(8), dp(8), dp(8), dp(8)],
-                        time_text=self.time_text if is_last else "",
-                        is_outgoing=self.is_outgoing if is_last else False,
-                        is_read=self.is_read if is_last else True,
-                        show_time_badge=show_time_badge if is_last else False
-                    )
-                    row.add_widget(pi)
-                container.add_widget(row)
-                idx += chunk_size
+                tl = dp(16) if (is_first_row and is_first_col and not self.sender_name) else dp(2)
+                tr = dp(16) if (is_first_row and is_last_col and not self.sender_name) else dp(2)
+                bl = (dp(16) if self.is_outgoing else dp(4)) if (is_last_row and is_first_col and not has_text) else dp(2)
+                br = (dp(4) if self.is_outgoing else dp(16)) if (is_last_row and is_last_col and not has_text) else dp(2)
+
+                pi = PhotoItem(
+                    url=p_item.get("url", ""),
+                    size_hint=(1.0 / count, 1),
+                    radius=[tl, tr, br, bl],
+                    time_text=self.time_text if is_last_photo else "",
+                    is_outgoing=self.is_outgoing if is_last_photo else False,
+                    is_read=self.is_read if is_last_photo else True,
+                    show_time_badge=show_time_badge if is_last_photo else False
+                )
+                row.add_widget(pi)
+                p_idx += 1
+            container.add_widget(row)
 
     def on_text(self, instance, value):
         from src.utils.formatters import check_time_needs_own_line

@@ -308,17 +308,92 @@ def estimate_photos_height(photos: list, container_width: float = 240.0) -> int:
     n = len(photos)
     if n == 1:
         ar = photos[0].get("aspect_ratio", 1.33)
-        h = container_width / ar
-        return int(max(120, min(260, h)))
+        h = container_width / ar if ar > 0 else 180
+        return int(max(130, min(260, h)))
     elif n == 2:
-        return 140
+        return 170
     elif n == 3:
-        return 215
+        return 140 + 105 + 2  # 247
     elif n == 4:
-        return 200
+        return 115 + 115 + 2  # 232
+    elif n == 5:
+        return 115 + 90 + 2   # 207
+    elif n == 6:
+        return 100 + 100 + 2  # 202
+    elif n == 7:
+        return 100 + 85 + 2   # 187
+    elif n == 8:
+        return 90 + 90 + 2    # 182
+    elif n == 9:
+        return 85 + 85 + 85 + 4  # 259
     else:
-        rows = (n + 2) // 3
-        return int(rows * 85)
+        # 10 photos: 4 in top row, 6 in bottom row (Screenshot 4)
+        return 115 + 85 + 2   # 202
+
+
+def estimate_bubble_width(
+    text: str = "",
+    photos: Optional[list] = None,
+    sender_name: str = "",
+    has_reply: bool = False,
+    has_fwd: bool = False,
+    time_needs_own_line: bool = False,
+    is_outgoing: bool = False,
+    is_group_chat: bool = False
+) -> int:
+    """Calculates dynamic bubble width in dp so short messages shrink-wrap tightly."""
+    try:
+        from kivy.core.window import Window
+        from kivy.metrics import dp
+        win_w = Window.width / dp(1) if (Window and getattr(Window, "width", 0) > 0) else 380
+    except Exception:
+        win_w = 380
+
+    avatar_space = 38 if (not is_outgoing and (is_group_chat or sender_name)) else 0
+    avail_w = win_w - 16 - avatar_space
+    max_bubble_w = max(160, int(avail_w * 0.78))
+
+    clean_text = clean_message_text(text) if text else ""
+    has_text = bool(clean_text.strip())
+    has_photos = bool(photos)
+    photo_count = len(photos) if photos else 0
+
+    if has_photos and photo_count >= 2:
+        return max_bubble_w
+
+    if has_photos and photo_count == 1:
+        ar = photos[0].get("aspect_ratio", 1.33) if photos else 1.33
+        h = max(130, min(260, 240 / ar if ar > 0 else 180))
+        single_p_w = int(h * ar)
+        req_w = min(max_bubble_w, max(180, single_p_w + (4 if not has_text else 28)))
+        if not has_text:
+            return req_w
+    else:
+        req_w = 0
+
+    if has_fwd or has_reply:
+        return max_bubble_w
+
+    padding_w = 28
+    sender_w = int(len(sender_name) * 8.0 + padding_w) if (sender_name and not is_outgoing) else 0
+
+    if has_text:
+        lines = clean_text.split("\n")
+        time_space = 52 if is_outgoing else 38
+        if len(lines) == 1:
+            line_w = int(len(lines[0]) * 7.5 + (time_space if not time_needs_own_line else 0))
+            text_w = line_w + padding_w
+        else:
+            max_line_len = max(len(l) for l in lines)
+            if (max_line_len * 7.5 + padding_w) < max_bubble_w:
+                text_w = int(max_line_len * 7.5 + padding_w)
+            else:
+                text_w = max_bubble_w
+    else:
+        text_w = 75  # Standalone timestamp width
+
+    needed = max(req_w, sender_w, text_w)
+    return min(max_bubble_w, max(75, needed))
 
 
 def estimate_message_height(

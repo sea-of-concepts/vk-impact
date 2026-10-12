@@ -163,7 +163,6 @@
 
 
 <PhotoItem>:
-    size_hint_y: None
     canvas.before:
         Color:
             rgba: (0.16, 0.18, 0.22, 0.5)
@@ -274,8 +273,8 @@
 
         # Left spacer for outgoing messages
         Widget:
-            size_hint_x: 0.22 if root.is_outgoing else None
-            width: 0 if root.is_outgoing else 0
+            size_hint_x: 1 if root.is_outgoing else None
+            width: 0
             opacity: 0
 
         # Small sender avatar for incoming messages in group chats
@@ -300,10 +299,11 @@
         BoxLayout:
             id: content_box
             orientation: "vertical"
-            size_hint_x: 0.78
+            size_hint_x: None
+            width: min(root.bubble_width, root.width - dp(16) - (dp(38) if (not root.is_outgoing and (root.is_group_chat or root.sender_avatar)) else 0))
             size_hint_y: None
             height: self.minimum_height
-            padding: [dp(3), dp(3), dp(3), dp(3)] if (root.photos and not root.text and not root.sender_name and not root.reply_message and not root.fwd_messages) else [dp(14), dp(4), dp(14), dp(4)]
+            padding: [dp(2), dp(2), dp(2), dp(2)] if (root.photos and not root.text and not root.sender_name and not root.reply_message and not root.fwd_messages) else [dp(14), dp(4), dp(14), dp(4)]
             spacing: dp(2)
             pos_hint: {"y": 0}
             canvas.before:
@@ -393,7 +393,7 @@
                 orientation: "vertical"
                 size_hint_y: None
                 height: self.minimum_height
-                spacing: dp(3)
+                spacing: dp(2)
 
             # Message Text & Timestamp Container
             RelativeLayout:
@@ -448,8 +448,8 @@
 
         # Right spacer for incoming messages
         Widget:
-            size_hint_x: None if root.is_outgoing else 0.22
-            width: 0 if not root.is_outgoing else 0
+            size_hint_x: None if root.is_outgoing else 1
+            width: 0
             opacity: 0
 
 

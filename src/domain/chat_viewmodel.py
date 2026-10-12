@@ -12,7 +12,15 @@ from src.core.events import event_bus
 from src.core.constants import EventType
 from src.core.logger import logger
 from src.utils.async_tools import run_async
-from src.utils.formatters import format_timestamp, estimate_message_height, check_time_needs_own_line, clean_message_text, extract_photo_attachments, format_fallback_attachment_text
+from src.utils.formatters import (
+    format_timestamp,
+    estimate_message_height,
+    estimate_bubble_width,
+    check_time_needs_own_line,
+    clean_message_text,
+    extract_photo_attachments,
+    format_fallback_attachment_text,
+)
 
 
 class ChatViewModel(BaseViewModel):
@@ -330,6 +338,16 @@ class ChatViewModel(BaseViewModel):
         temp_id = -now
         time_needs_own = check_time_needs_own_line(text, is_outgoing=True)
         height = estimate_message_height(text, has_sender_name=False, has_reply=bool(reply_preview), time_needs_own_line=time_needs_own)
+        bw = estimate_bubble_width(
+            text=text,
+            photos=[],
+            sender_name="",
+            has_reply=bool(reply_preview),
+            has_fwd=False,
+            time_needs_own_line=time_needs_own,
+            is_outgoing=True,
+            is_group_chat=(self.peer_id >= 2000000000 or self.peer_id < 0)
+        )
         opt_item = {
             "message_id": temp_id,
             "from_id": 0,
@@ -346,6 +364,7 @@ class ChatViewModel(BaseViewModel):
             "reply_message": reply_preview or {},
             "fwd_messages": [],
             "time_needs_own_line": time_needs_own,
+            "bubble_width": dp(bw),
             "msg_size": [None, dp(height)]
         }
         self.messages = list(self.messages) + [opt_item]
@@ -458,6 +477,17 @@ class ChatViewModel(BaseViewModel):
                                 time_needs_own_line=time_needs_own,
                                 photos=photos
                             )
+                            bw = estimate_bubble_width(
+                                text=t,
+                                photos=photos,
+                                sender_name=full_n,
+                                has_reply=bool(reply),
+                                has_fwd=bool(fwds),
+                                time_needs_own_line=time_needs_own,
+                                is_outgoing=False,
+                                is_group_chat=m_copy.get("is_group_chat", False)
+                            )
+                            m_copy["bubble_width"] = dp(bw)
                             m_copy["msg_size"] = [None, dp(h)]
                             new_messages.append(m_copy)
                             updated = True
@@ -521,6 +551,17 @@ class ChatViewModel(BaseViewModel):
             )
             total_height = base_height + (28 if is_first_unread else 0)
 
+            bubble_w = estimate_bubble_width(
+                text=raw_text,
+                photos=photos,
+                sender_name=sender_name,
+                has_reply=bool(reply),
+                has_fwd=bool(fwds),
+                time_needs_own_line=time_needs_own,
+                is_outgoing=m.is_outgoing,
+                is_group_chat=(self.peer_id >= 2000000000 or self.peer_id < 0)
+            )
+
             sender_style = ""
             if not m.is_outgoing:
                 cached_user = users_repo._memory_cache.get(m.from_id, {})
@@ -542,6 +583,7 @@ class ChatViewModel(BaseViewModel):
                 "reply_message": reply if isinstance(reply, dict) else {},
                 "fwd_messages": fwds if isinstance(fwds, list) else [],
                 "time_needs_own_line": time_needs_own,
+                "bubble_width": dp(bubble_w),
                 "msg_size": [None, dp(total_height)]
             }
         except Exception as e:
@@ -561,6 +603,7 @@ class ChatViewModel(BaseViewModel):
                 "show_new_divider": False,
                 "reply_message": {},
                 "fwd_messages": [],
+                "bubble_width": dp(220),
                 "msg_size": [None, dp(64)]
             }
 
@@ -797,6 +840,17 @@ class ChatViewModel(BaseViewModel):
                                             fwd_count=len(m.get("fwd_messages", [])),
                                             photos=fetched_photos
                                         )
+                                        bw = estimate_bubble_width(
+                                            text=m.get("text", ""),
+                                            photos=fetched_photos,
+                                            sender_name=m.get("sender_name", ""),
+                                            has_reply=bool(m.get("reply_message")),
+                                            has_fwd=bool(m.get("fwd_messages")),
+                                            time_needs_own_line=m.get("time_needs_own_line", False),
+                                            is_outgoing=m.get("is_outgoing", False),
+                                            is_group_chat=m.get("is_group_chat", False)
+                                        )
+                                        m["bubble_width"] = dp(bw)
                                         m["msg_size"] = [None, dp(h)]
                                         break
                                 self.messages = list(self.messages)
@@ -820,6 +874,16 @@ class ChatViewModel(BaseViewModel):
             time_needs_own_line=time_needs_own,
             photos=photos
         )
+        bw = estimate_bubble_width(
+            text=clean_text,
+            photos=photos,
+            sender_name=sender_name,
+            has_reply=bool(reply),
+            has_fwd=bool(fwds),
+            time_needs_own_line=time_needs_own,
+            is_outgoing=is_out,
+            is_group_chat=(self.peer_id >= 2000000000 or self.peer_id < 0)
+        )
 
         new_item = {
             "message_id": message_id,
@@ -837,6 +901,7 @@ class ChatViewModel(BaseViewModel):
             "reply_message": reply if isinstance(reply, dict) else {},
             "fwd_messages": fwds if isinstance(fwds, list) else [],
             "time_needs_own_line": time_needs_own,
+            "bubble_width": dp(bw),
             "msg_size": [None, dp(height)]
         }
         self.messages = list(self.messages) + [new_item]
