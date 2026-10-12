@@ -175,20 +175,21 @@ def _measure_text_height(text: str, font_size_sp: int = 15, is_outgoing: bool = 
     return total_lines * line_h
 
 
-def get_text_width_dp(text: str, font_size_sp: int = 15) -> float:
+def get_text_width_dp(text: str, font_size_sp: int = 15, bold: bool = False) -> float:
     """Measures exact width of a single-line string in dp using Kivy CoreLabel."""
     if not text:
         return 0.0
     try:
         from kivy.core.text import Label as CoreLabel
         from kivy.metrics import sp, dp
-        c = CoreLabel(text=text, font_size=sp(font_size_sp))
+        c = CoreLabel(text=text, font_size=sp(font_size_sp), bold=bold)
         c.refresh()
         if c.texture and c.texture.size[0] > 0:
             return c.texture.size[0] / dp(1)
     except Exception:
         pass
-    return len(text) * 8.5
+    char_factor = 9.0 if bold else 8.5
+    return len(text) * (char_factor * (font_size_sp / 15.0))
 
 
 def check_time_needs_own_line(text: str, is_outgoing: bool = False, max_w_dp: Optional[float] = None) -> bool:
@@ -401,7 +402,9 @@ def estimate_bubble_width(
         return max_bubble_w
 
     padding_w = 24  # 12dp left + 12dp right
-    sender_w = int(get_text_width_dp(sender_name, 12) + padding_w) if (sender_name and not is_outgoing) else 0
+    # Generous margin (+30dp) for sender name ensures that if sender name is wider than text,
+    # the entire full name fits comfortably on a single line inside the bubble without word-wrapping.
+    sender_w = int(get_text_width_dp(sender_name, 12, bold=True) + padding_w + 6) if (sender_name and not is_outgoing) else 0
 
     if has_text:
         lines = clean_text.split("\n")
